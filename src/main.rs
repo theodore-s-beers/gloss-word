@@ -17,7 +17,8 @@ fn main() -> Result<(), isahc::Error> {
     };
 
     // First real arg is the desired word
-    let desired_word = &args[1];
+    // Lowercase it for good measure (performance impact seems negligible)
+    let desired_word = &args[1].to_lowercase();
 
     // See if we can get the home directory
     let home_dir = home::home_dir();
