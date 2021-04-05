@@ -1,11 +1,13 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
-use std::{env, fs};
+use std::process::Command;
+use std::{env, fs, str};
 
 use isahc::prelude::*;
 use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
+use tempfile::NamedTempFile;
 
 fn main() -> Result<(), isahc::Error> {
     // Collect args
@@ -125,11 +127,11 @@ fn main() -> Result<(), isahc::Error> {
     let response_text = response.text()?;
 
     // Set up a regex to split the document
-    let re = Regex::new(r#"<div id="Thesaurus">"#).unwrap();
+    let re_thesaurus = Regex::new(r#"<div id="Thesaurus">"#).unwrap();
 
     // Split document into two chunks
     // Otherwise we could blow a bunch of time parsing the whole thing
-    let chunks: Vec<&str> = re.split(&response_text).collect();
+    let chunks: Vec<&str> = re_thesaurus.split(&response_text).collect();
 
     // Parse the first chunk, which is the one we want
     let parsed_chunk = Html::parse_fragment(chunks[0]);
@@ -156,6 +158,46 @@ fn main() -> Result<(), isahc::Error> {
             results.push_str(&element.html());
         }
 
+        // Update: now we're calling out to Pandoc from the Rust program
+        // It still requires two runs with regex replacement in between
+        // I'm using tempfiles to feed input to Pandoc
+        // At the end, we have a nice plain text file to cache
+
+        let mut pandoc_input = NamedTempFile::new().expect("Failed to create tempfile");
+        write!(pandoc_input, "{}", results).expect("Failed to write to tempfile");
+
+        let pandoc_1 = Command::new("pandoc")
+            .arg(pandoc_input.path())
+            .arg("-f")
+            .arg("html+smart-native_divs")
+            .arg("-t")
+            .arg("markdown")
+            .arg("--wrap=none")
+            .output()
+            .expect("Failed to execute Pandoc");
+
+        let output_1 =
+            str::from_utf8(&pandoc_1.stdout).expect("Failed to convert Pandoc output to string");
+
+        let re_list_1 = regex::Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap();
+        let after_1 = re_list_1.replace_all(&output_1, "\n$a").to_string();
+
+        let re_list_2 = regex::Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
+        let after_2 = re_list_2.replace_all(&after_1, "\n    $b").to_string();
+
+        let mut input_file_2 = NamedTempFile::new().expect("Failed to create tempfile");
+        write!(input_file_2, "{}", after_2).expect("Failed to write to tempfile");
+
+        let pandoc_2 = Command::new("pandoc")
+            .arg(input_file_2.path())
+            .arg("-t")
+            .arg("plain")
+            .output()
+            .expect("Failed to execute Pandoc");
+
+        let final_output =
+            str::from_utf8(&pandoc_2.stdout).expect("Failed to convert Pandoc output to string");
+
         // If the cache path proved available earlier, try to create a file
         if cache_path_exists {
             let new_file = File::create(&notional_file_path);
@@ -163,26 +205,46 @@ fn main() -> Result<(), isahc::Error> {
             // If we have the new file, write the results into it
             // Again, errors are just ignored
             if let Ok(mut file) = new_file {
-                let _ = file.write_all(results.as_bytes());
+                let _ = file.write_all(final_output.as_bytes());
             };
         }
 
-        // We still need to print results, since they get piped along
-        print!("{}", results);
+        // We still need to print results, of course
+        print!("{}", final_output);
     } else {
         // Otherwise let's check for a list of similar words
-        let suggestions_selector = Selector::parse(r#"ul.suggestions li"#).unwrap();
+        let suggestions_selector = Selector::parse("ul.suggestions li").unwrap();
         let suggestions_vec: Vec<ElementRef> = parsed_chunk.select(&suggestions_selector).collect();
 
         // Again, see if we got anything
         if suggestions_vec.len() > 0 {
-            // If so, start by printing a brief explanatory message
-            print!("Did you mean:");
+            // If so, collect results
+            let mut results = String::new();
 
-            // Iterate over the vec of elements and print them all
             for element in suggestions_vec.iter() {
-                print!("{}", element.html());
+                results.push_str(&element.html());
             }
+
+            // Put them through Pandoc quickly to get clean plain text
+            let mut pandoc_input = NamedTempFile::new().expect("Failed to create tempfile");
+            write!(pandoc_input, "{}", results).expect("Failed to write to tempfile");
+
+            let pandoc_1 = Command::new("pandoc")
+                .arg(pandoc_input.path())
+                .arg("-f")
+                .arg("html+smart-native_divs")
+                .arg("-t")
+                .arg("plain")
+                .output()
+                .expect("Failed to execute Pandoc");
+
+            let output_1 = str::from_utf8(&pandoc_1.stdout)
+                .expect("Failed to convert Pandoc output to string");
+
+            // Print an explanatory message first
+            print!("Did you mean:\n\n");
+
+            print!("{}", output_1);
         } else {
             // If still no dice, panic
             panic!("Definition not found");
