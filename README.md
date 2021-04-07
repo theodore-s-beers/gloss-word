@@ -9,8 +9,9 @@ pulled from the [Online Etymology Dictionary](https://www.etymonline.com/).
 
 While the package is called `gloss-word`—since I may publish it to
 [crates.io](https://crates.io/) and need a unique name—the binary itself, and
-hence the command, is `gloss`. I like to use a shell function (pasted below) to
-pipe the output to [`bat`](https://github.com/sharkdp/bat) for pretty-printing.
+hence the command, is `gloss`. I like to use a shell function to pipe the output
+to [`bat`](https://github.com/sharkdp/bat) for pretty-printing. That's pasted
+below.
 
 In short, the program makes a request (if necessary) to the appropriate website;
 scrapes relevant HTML elements; converts that material to nicely formatted plain
@@ -40,8 +41,8 @@ gloss() {
 }
 ```
 
-`bat` is a Rust quasi-reimplementation of `cat`, which I enjoy. You might also
-like to give it a try.
+[`bat`](https://github.com/sharkdp/bat) is a Rust quasi-reimplementation of
+`cat`, which I enjoy. You might also like to give it a try.
 
 ## asciicast
 
