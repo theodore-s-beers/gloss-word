@@ -12,7 +12,7 @@ use tempfile::NamedTempFile;
 
 fn main() -> Result<(), isahc::Error> {
     // Set up CLI
-    let matches = App::new("ahd-scrape")
+    let matches = App::new("gloss-word")
         .version(crate_version!())
         .author("Theo Beers <theo.beers@fu-berlin.de>")
         .about("A simple CLI dictionary")
@@ -62,11 +62,11 @@ fn main() -> Result<(), isahc::Error> {
         notional_file_path.push_str(&home_dir_str);
 
         if etym_mode {
-            notional_file_path.push_str("/.ahd-scrape/etym-cache/");
+            notional_file_path.push_str("/.gloss-word/etym-cache/");
             notional_file_path.push_str(&desired_word);
             notional_file_path.push_str(".txt");
         } else {
-            notional_file_path.push_str("/.ahd-scrape/def-cache/");
+            notional_file_path.push_str("/.gloss-word/def-cache/");
             notional_file_path.push_str(&desired_word);
             notional_file_path.push_str(".txt");
         }
@@ -77,9 +77,9 @@ fn main() -> Result<(), isahc::Error> {
         cache_path.push_str(&home_dir_str);
 
         if etym_mode {
-            cache_path.push_str("/.ahd-scrape/etym-cache");
+            cache_path.push_str("/.gloss-word/etym-cache");
         } else {
-            cache_path.push_str("/.ahd-scrape/def-cache");
+            cache_path.push_str("/.gloss-word/def-cache");
         }
 
         // println!("Cache dir path: {}", cache_path);

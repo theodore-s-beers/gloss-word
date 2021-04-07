@@ -3,18 +3,6 @@
 version = 3
 
 [[package]]
-name = "ahd-scrape"
-version = "0.1.0"
-dependencies = [
- "clap",
- "home",
- "isahc",
- "regex",
- "scraper",
- "tempfile",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -352,6 +340,18 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi 0.10.2+wasi-snapshot-preview1",
+]
+
+[[package]]
+name = "gloss-word"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "home",
+ "isahc",
+ "regex",
+ "scraper",
+ "tempfile",
 ]
 
 [[package]]
