@@ -24,8 +24,10 @@ binary. I should note, however, that I wrote this program for my own use on
 macOS, and I haven't yet tested it on Windows or Linux. I'm sure that some
 adjustments will be necessary.
 
-Cached results are in the form of individual text files in the directories
-`$HOME/.gloss-word/def-cache` and `$HOME/.gloss-word/etym-cache`.
+Cached results are currently in the form of individual text files, in what is
+supposed to be a platform-appropriate location (relying on the
+[`directories`](https://github.com/dirs-dev/directories-rs) library). At some
+point I may figure out how to manage caching with SQLite instead.
 
 Answers to a few other potential questions: _Why scrape from TFD, as opposed to
 other good dictionary sites?_ I actually tried Wiktionary first, but their
