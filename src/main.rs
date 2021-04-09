@@ -16,7 +16,7 @@ fn main() -> Result<(), isahc::Error> {
     let matches = App::new("gloss-word")
         .version(crate_version!())
         .author("Theo Beers <theo.beers@fu-berlin.de>")
-        .about("A simple CLI dictionary")
+        .about("A simple English dictionary lookup utility")
         .arg(
             Arg::with_name("etym")
                 .short("e")
