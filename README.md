@@ -27,7 +27,7 @@ adjustments will be necessary.
 Cached results are currently in the form of individual text files, in what is
 supposed to be a platform-appropriate location (relying on the
 [`directories`](https://github.com/dirs-dev/directories-rs) library). At some
-point I may figure out how to manage caching with SQLite instead.
+point I may figure out how to use SQLite for caching.
 
 Answers to a few other potential questions: _Why scrape from TFD, as opposed to
 other good dictionary sites?_ I actually tried Wiktionary first, but their
