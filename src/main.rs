@@ -1,10 +1,11 @@
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use std::{fs, str};
 
 use clap::{crate_version, App, Arg};
+use directories::ProjectDirs;
 use isahc::prelude::*;
 use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
@@ -34,96 +35,50 @@ fn main() -> Result<(), isahc::Error> {
     let etym_mode: bool = matches.is_present("etym");
 
     // Take input and lowercase it
+    // Is this ok to unwrap, or should I switch to expect?
     let desired_word = matches.value_of("INPUT").unwrap().to_lowercase();
 
-    // See if we can get the home directory
-    let home_dir = home::home_dir();
+    // Do we even have the relevant cache subdir? False by default
+    let mut has_cache_subdir = false;
 
-    // Is there a path that we should check for a cached result?
-    // False by default
-    let mut maybe_file_path = false;
+    // Set up a PathBuf for a possible path, and a filename
+    let mut notional_file_path = PathBuf::new();
+    let notional_filename = desired_word.clone() + ".txt";
 
-    // Set up a string for a possible path
-    let mut notional_file_path = String::new();
+    // Try at least to get to the point of having the cache subdir available
+    if let Some(proj_dirs) = ProjectDirs::from("com", "theobeers", "gloss-word") {
+        let cache_dir = proj_dirs.cache_dir();
 
-    // We also need to check for the cache directory
-    let mut cache_path = String::new();
+        let mut cache_subdir = PathBuf::from(cache_dir);
 
-    // Let's make a global variable for cache directory availability
-    // False until further notice
-    let mut cache_path_exists = false;
-
-    // If we did get a home directory, assemble the notional file path
-    if let Some(path) = &home_dir {
-        let home_dir_str = path.to_string_lossy();
-
-        // println!("Home dir path: {}", home_dir_str);
-
-        notional_file_path.push_str(&home_dir_str);
-
+        // Set relevant subdir name
         if etym_mode {
-            notional_file_path.push_str("/.gloss-word/etym-cache/");
-            notional_file_path.push_str(&desired_word);
-            notional_file_path.push_str(".txt");
+            cache_subdir.push("etym")
         } else {
-            notional_file_path.push_str("/.gloss-word/def-cache/");
-            notional_file_path.push_str(&desired_word);
-            notional_file_path.push_str(".txt");
+            cache_subdir.push("def")
         }
 
-        // println!("Desired file path: {}", notional_file_path);
+        if cache_subdir.exists() {
+            // Already had cache subdir
+            has_cache_subdir = true;
 
-        // Also put together the cache directory path
-        cache_path.push_str(&home_dir_str);
-
-        if etym_mode {
-            cache_path.push_str("/.gloss-word/etym-cache");
+            notional_file_path.push(cache_subdir);
+            notional_file_path.push(notional_filename);
         } else {
-            cache_path.push_str("/.gloss-word/def-cache");
-        }
+            // Else try to create it
+            let create_subdir = fs::create_dir_all(&cache_subdir);
 
-        // println!("Cache dir path: {}", cache_path);
+            if create_subdir.is_ok() {
+                has_cache_subdir = true;
 
-        // Test for availability of the cache path
-        // Set the global boolean accordingly
-        // I had a hard time appeasing the compiler here
-        let test_cache_path = Path::new(&cache_path).exists();
-        if test_cache_path {
-            cache_path_exists = true;
-        }
-
-        // println!("First check for cache dir: {}", cache_path_exists);
-
-        // If it isn't there, try creating it
-        if !cache_path_exists {
-            let try_create_cache = fs::create_dir_all(&cache_path);
-            if try_create_cache.is_ok() {
-                cache_path_exists = true;
+                notional_file_path.push(cache_subdir);
+                notional_file_path.push(notional_filename);
             }
         }
-
-        // println!("Second check for cache dir: {}", cache_path_exists);
-
-        // Now, if we have the cache directory, set maybe_file_path to true
-        if cache_path_exists {
-            maybe_file_path = true;
-        }
     }
 
-    // Does the notional file path exist? False by default
-    let mut file_path_exists = false;
-
-    // If all is well so far, check the file path
-    // If it's there (and can be accessed), this will evaluate to true
-    if maybe_file_path {
-        file_path_exists = Path::new(&notional_file_path).exists();
-    }
-
-    // println!("Check for file path: {}", file_path_exists);
-
-    // Now we try to read the file at the given path
-    // All errors are ignored; the program would just move on
-    if file_path_exists {
+    // If the appropriate file path actually exists, try to read it
+    if has_cache_subdir && notional_file_path.exists() {
         let try_open = File::open(&notional_file_path);
 
         if let Ok(mut file) = try_open {
@@ -131,7 +86,7 @@ fn main() -> Result<(), isahc::Error> {
             let try_read = file.read_to_string(&mut contents);
 
             if try_read.is_ok() {
-                // Success? Print file contents (to be piped) and return
+                // Success? Print file contents and return
                 print!("{}", contents);
 
                 return Ok(());
@@ -140,7 +95,7 @@ fn main() -> Result<(), isahc::Error> {
     }
 
     // If we're moving on, it means we didn't get a cached result
-    // This is, of course, the default case
+    // That's fine; it's going to be the default case
 
     // Assemble URL
 
@@ -160,11 +115,11 @@ fn main() -> Result<(), isahc::Error> {
     // Get the document text
     let response_text = response.text()?;
 
-    // Set up a regex to split the document
-    // This won't do anything in etymology mode
+    // Set up a regex to split the document, in definition mode
+    // In etymology mode, this shouldn't do anything
     let re_thesaurus = Regex::new(r#"<div id="Thesaurus">"#).unwrap();
 
-    // Split document into two chunks (if in definition mode)
+    // Split document (if applicable)
     // Otherwise we could blow a bunch of time parsing the whole thing
     let chunks: Vec<&str> = re_thesaurus.split(&response_text).collect();
 
@@ -178,7 +133,7 @@ fn main() -> Result<(), isahc::Error> {
         _ => Selector::parse(r#"div#Definition section[data-src="hm"]"#).unwrap(),
     };
 
-    // Run the select iterator and collect the result in a vec
+    // Run the select iterator and collect the result(s) in a vec
     // For definition lookup, this should yield either one item, or nothing
     // For etymology lookup, it could yield multiple sections
     let section_vec: Vec<ElementRef> = parsed_chunk.select(&section_selector).collect();
@@ -206,7 +161,7 @@ fn main() -> Result<(), isahc::Error> {
         // Update: now we're calling out to Pandoc from the Rust program
         // It still requires two runs with regex replacement in between
         // I'm using tempfiles to feed input to Pandoc
-        // At the end, we have a nice plain text file to cache
+        // At the end, we should have a nice plain text file to cache
 
         let mut final_output = String::new();
 
@@ -227,7 +182,7 @@ fn main() -> Result<(), isahc::Error> {
             let output_1 = str::from_utf8(&pandoc_1.stdout)
                 .expect("Failed to convert Pandoc output to string");
 
-            let re_quotes = regex::Regex::new(r#"\\""#).unwrap();
+            let re_quotes = Regex::new(r#"\\""#).unwrap();
             let after = re_quotes.replace_all(&output_1, r#"""#).to_string();
 
             let mut input_file_2 = NamedTempFile::new().expect("Failed to create tempfile");
@@ -261,10 +216,10 @@ fn main() -> Result<(), isahc::Error> {
             let output_1 = str::from_utf8(&pandoc_1.stdout)
                 .expect("Failed to convert Pandoc output to string");
 
-            let re_list_1 = regex::Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap();
+            let re_list_1 = Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap();
             let after_1 = re_list_1.replace_all(&output_1, "\n$a").to_string();
 
-            let re_list_2 = regex::Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
+            let re_list_2 = Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
             let after_2 = re_list_2.replace_all(&after_1, "\n    $b").to_string();
 
             let mut input_file_2 = NamedTempFile::new().expect("Failed to create tempfile");
@@ -283,8 +238,8 @@ fn main() -> Result<(), isahc::Error> {
             final_output.push_str(output_2);
         }
 
-        // If the cache path proved available earlier, try to create a file
-        if cache_path_exists {
+        // If the cache subdir proved available earlier, try to create a file
+        if has_cache_subdir {
             let try_file = File::create(&notional_file_path);
 
             // If we have the new file, write the results into it
