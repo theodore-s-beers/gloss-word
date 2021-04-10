@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use std::{fs, str};
@@ -8,8 +7,15 @@ use clap::{crate_version, App, Arg};
 use directories::ProjectDirs;
 use isahc::prelude::*;
 use regex::Regex;
+use rusqlite::{Connection, Result};
 use scraper::{ElementRef, Html, Selector};
 use tempfile::NamedTempFile;
+
+#[derive(Debug)]
+struct Entry {
+    word: String,
+    content: String,
+}
 
 fn main() -> Result<(), isahc::Error> {
     // Set up CLI
@@ -38,58 +44,95 @@ fn main() -> Result<(), isahc::Error> {
     // Is this ok to unwrap, or should I switch to expect?
     let desired_word = matches.value_of("INPUT").unwrap().to_lowercase();
 
-    // Do we even have the relevant cache subdir? False by default
-    let mut has_cache_subdir = false;
+    // Is the cache db available? Also set up a variable for its path
+    let mut db_available = false;
+    let mut db_path = PathBuf::new();
 
-    // Set up a PathBuf for a possible path, and a filename
-    let mut notional_file_path = PathBuf::new();
-    let notional_filename = desired_word.clone() + ".txt";
-
-    // Try at least to get to the point of having the cache subdir available
+    // Try at least to get to the point of having the db available
     if let Some(proj_dirs) = ProjectDirs::from("com", "theobeers", "gloss-word") {
         let cache_dir = proj_dirs.cache_dir();
 
-        let mut cache_subdir = PathBuf::from(cache_dir);
-
-        // Set relevant subdir name
-        if etym_mode {
-            cache_subdir.push("etym")
-        } else {
-            cache_subdir.push("def")
+        // If we don't have the cache dir yet, try to create it
+        if !cache_dir.exists() {
+            let _ = fs::create_dir_all(cache_dir);
         }
 
-        if cache_subdir.exists() {
-            // Already had cache subdir
-            has_cache_subdir = true;
+        // Construct appropriate path for db
+        db_path.push(cache_dir);
+        db_path.push("entries.sqlite");
 
-            notional_file_path.push(cache_subdir);
-            notional_file_path.push(notional_filename);
-        } else {
-            // Else try to create it
-            let create_subdir = fs::create_dir_all(&cache_subdir);
-
-            if create_subdir.is_ok() {
-                has_cache_subdir = true;
-
-                notional_file_path.push(cache_subdir);
-                notional_file_path.push(notional_filename);
+        // Create and/or connect to db; create table if needed
+        if let Ok(db_conn) = Connection::open(&db_path) {
+            if etym_mode {
+                if db_conn
+                    .execute(
+                        "CREATE TABLE IF NOT EXISTS etymology (
+                                word        TEXT UNIQUE NOT NULL,
+                                content     TEXT NOT NULL
+                            )",
+                        [],
+                    )
+                    .is_ok()
+                {
+                    db_available = true
+                }
+            } else if db_conn
+                .execute(
+                    "CREATE TABLE IF NOT EXISTS dictionary (
+                            word        TEXT UNIQUE NOT NULL,
+                            content     TEXT NOT NULL
+                        )",
+                    [],
+                )
+                .is_ok()
+            {
+                db_available = true
             }
         }
     }
 
-    // If the appropriate file path actually exists, try to read it
-    if has_cache_subdir && notional_file_path.exists() {
-        let try_open = File::open(&notional_file_path);
+    // If the db is all set, check for a cached result
+    // Errors are ignored wherever possible
+    if db_available && etym_mode {
+        if let Ok(db_conn) = Connection::open(&db_path) {
+            let mut query = String::from("SELECT * FROM etymology WHERE word='");
+            query.push_str(&desired_word);
+            query.push('\'');
 
-        if let Ok(mut file) = try_open {
-            let mut contents = String::new();
-            let try_read = file.read_to_string(&mut contents);
+            if let Ok(mut stmt) = db_conn.prepare(&query) {
+                if let Ok(entry_iter) = stmt.query_map([], |row| {
+                    Ok(Entry {
+                        word: row.get(0).unwrap(),
+                        content: row.get(1).unwrap(),
+                    })
+                }) {
+                    // If we got something, print it and return
+                    if let Some(actual_entry) = entry_iter.flatten().next() {
+                        print!("{}", actual_entry.content);
+                        return Ok(());
+                    }
+                }
+            }
+        }
+    } else if db_available {
+        if let Ok(db_conn) = Connection::open(&db_path) {
+            let mut query = String::from("SELECT * FROM dictionary WHERE word='");
+            query.push_str(&desired_word);
+            query.push('\'');
 
-            if try_read.is_ok() {
-                // Success? Print file contents and return
-                print!("{}", contents);
-
-                return Ok(());
+            if let Ok(mut stmt) = db_conn.prepare(&query) {
+                if let Ok(entry_iter) = stmt.query_map([], |row| {
+                    Ok(Entry {
+                        word: row.get(0).unwrap(),
+                        content: row.get(1).unwrap(),
+                    })
+                }) {
+                    // If we got something, print it and return
+                    if let Some(actual_entry) = entry_iter.flatten().next() {
+                        print!("{}", actual_entry.content);
+                        return Ok(());
+                    }
+                }
             }
         }
     }
@@ -159,9 +202,8 @@ fn main() -> Result<(), isahc::Error> {
         }
 
         // Update: now we're calling out to Pandoc from the Rust program
-        // It still requires two runs with regex replacement in between
+        // It still requires two runs, with regex replacement in between
         // I'm using tempfiles to feed input to Pandoc
-        // At the end, we should have a nice plain text file to cache
 
         let mut final_output = String::new();
 
@@ -238,15 +280,21 @@ fn main() -> Result<(), isahc::Error> {
             final_output.push_str(output_2);
         }
 
-        // If the cache subdir proved available earlier, try to create a file
-        if has_cache_subdir {
-            let try_file = File::create(&notional_file_path);
-
-            // If we have the new file, write the results into it
-            // Again, errors are just ignored
-            if let Ok(mut file) = try_file {
-                let _ = file.write_all(final_output.as_bytes());
-            };
+        // If the cache db proved available, try to reconnect and insert
+        if db_available && etym_mode {
+            if let Ok(db_conn) = Connection::open(db_path) {
+                let _ = db_conn.execute(
+                    "INSERT INTO etymology (word, content) values (?1, ?2)",
+                    [&desired_word, &final_output],
+                );
+            }
+        } else if db_available {
+            if let Ok(db_conn) = Connection::open(db_path) {
+                let _ = db_conn.execute(
+                    "INSERT INTO dictionary (word, content) values (?1, ?2)",
+                    [&desired_word, &final_output],
+                );
+            }
         }
 
         // We still need to print results, of course
