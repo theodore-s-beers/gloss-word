@@ -18,7 +18,10 @@ struct Entry {
 }
 
 fn main() -> Result<(), isahc::Error> {
-    // Set up CLI
+    //
+    // CLI SETUP
+    //
+
     let matches = App::new("gloss-word")
         .version(crate_version!())
         .author("Theo Beers <theo.beers@fu-berlin.de>")
@@ -37,6 +40,10 @@ fn main() -> Result<(), isahc::Error> {
         )
         .get_matches();
 
+    //
+    // GLOBAL VARIABLES
+    //
+
     // Do we have the etymology flag?
     let etym_mode: bool = matches.is_present("etym");
 
@@ -48,8 +55,16 @@ fn main() -> Result<(), isahc::Error> {
     let mut db_available = false;
     let mut db_path = PathBuf::new();
 
+    //
+    // CHECK FOR CACHED RESULT
+    //
+
+    // In this whole section, errors tend to be ignored
+    // Failure will just means fetching from the relevant website
+
     // Try at least to get to the point of having the db available
     if let Some(proj_dirs) = ProjectDirs::from("com", "theobeers", "gloss-word") {
+        // This should give us a platform-appropriate cache directory
         let cache_dir = proj_dirs.cache_dir();
 
         // If we don't have the cache dir yet, try to create it
@@ -63,6 +78,7 @@ fn main() -> Result<(), isahc::Error> {
 
         // Create and/or connect to db; create table if needed
         if let Ok(db_conn) = Connection::open(&db_path) {
+            // Handle etymology mode first
             if etym_mode {
                 if db_conn
                     .execute(
@@ -74,8 +90,31 @@ fn main() -> Result<(), isahc::Error> {
                     )
                     .is_ok()
                 {
-                    db_available = true
+                    // Indicate that db is available (for later, if needed)
+                    db_available = true;
+
+                    // Set up query for possible cached result
+                    let mut query = String::from("SELECT * FROM etymology WHERE word='");
+                    query.push_str(&desired_word);
+                    query.push('\'');
+
+                    // Run the query
+                    if let Ok(mut stmt) = db_conn.prepare(&query) {
+                        if let Ok(entry_iter) = stmt.query_map([], |row| {
+                            Ok(Entry {
+                                word: row.get(0)?,
+                                content: row.get(1)?,
+                            })
+                        }) {
+                            // If we got something, print it and return
+                            if let Some(actual_entry) = entry_iter.flatten().next() {
+                                print!("{}", actual_entry.content);
+                                return Ok(());
+                            }
+                        }
+                    }
                 }
+            // Else the default is dictionary mode
             } else if db_conn
                 .execute(
                     "CREATE TABLE IF NOT EXISTS dictionary (
@@ -86,51 +125,27 @@ fn main() -> Result<(), isahc::Error> {
                 )
                 .is_ok()
             {
-                db_available = true
-            }
-        }
-    }
+                // Indicate that db is available (for later, if needed)
+                db_available = true;
 
-    // If the db is all set, check for a cached result
-    // Errors are ignored wherever possible
-    if db_available && etym_mode {
-        if let Ok(db_conn) = Connection::open(&db_path) {
-            let mut query = String::from("SELECT * FROM etymology WHERE word='");
-            query.push_str(&desired_word);
-            query.push('\'');
+                // Set up query for possible cached result
+                let mut query = String::from("SELECT * FROM dictionary WHERE word='");
+                query.push_str(&desired_word);
+                query.push('\'');
 
-            if let Ok(mut stmt) = db_conn.prepare(&query) {
-                if let Ok(entry_iter) = stmt.query_map([], |row| {
-                    Ok(Entry {
-                        word: row.get(0).unwrap(),
-                        content: row.get(1).unwrap(),
-                    })
-                }) {
-                    // If we got something, print it and return
-                    if let Some(actual_entry) = entry_iter.flatten().next() {
-                        print!("{}", actual_entry.content);
-                        return Ok(());
-                    }
-                }
-            }
-        }
-    } else if db_available {
-        if let Ok(db_conn) = Connection::open(&db_path) {
-            let mut query = String::from("SELECT * FROM dictionary WHERE word='");
-            query.push_str(&desired_word);
-            query.push('\'');
-
-            if let Ok(mut stmt) = db_conn.prepare(&query) {
-                if let Ok(entry_iter) = stmt.query_map([], |row| {
-                    Ok(Entry {
-                        word: row.get(0).unwrap(),
-                        content: row.get(1).unwrap(),
-                    })
-                }) {
-                    // If we got something, print it and return
-                    if let Some(actual_entry) = entry_iter.flatten().next() {
-                        print!("{}", actual_entry.content);
-                        return Ok(());
+                // Run the query
+                if let Ok(mut stmt) = db_conn.prepare(&query) {
+                    if let Ok(entry_iter) = stmt.query_map([], |row| {
+                        Ok(Entry {
+                            word: row.get(0)?,
+                            content: row.get(1)?,
+                        })
+                    }) {
+                        // If we got something, print it and return
+                        if let Some(actual_entry) = entry_iter.flatten().next() {
+                            print!("{}", actual_entry.content);
+                            return Ok(());
+                        }
                     }
                 }
             }
@@ -140,7 +155,9 @@ fn main() -> Result<(), isahc::Error> {
     // If we're moving on, it means we didn't get a cached result
     // That's fine; it's going to be the default case
 
-    // Assemble URL
+    //
+    // SCRAPING & CACHING
+    //
 
     let mut lookup_url: String;
 
@@ -322,7 +339,7 @@ fn main() -> Result<(), isahc::Error> {
             let mut pandoc_input = NamedTempFile::new().expect("Failed to create tempfile");
             write!(pandoc_input, "{}", results).expect("Failed to write to tempfile");
 
-            let pandoc_1 = Command::new("pandoc")
+            let pandoc = Command::new("pandoc")
                 .arg(pandoc_input.path())
                 .arg("-f")
                 .arg("html+smart-native_divs")
@@ -331,12 +348,12 @@ fn main() -> Result<(), isahc::Error> {
                 .output()
                 .expect("Failed to execute Pandoc");
 
-            let output_1 = str::from_utf8(&pandoc_1.stdout)
-                .expect("Failed to convert Pandoc output to string");
+            let pandoc_output =
+                str::from_utf8(&pandoc.stdout).expect("Failed to convert Pandoc output to string");
 
             // Print an explanatory message, then the results
             print!("Did you mean:\n\n");
-            print!("{}", output_1);
+            print!("{}", pandoc_output);
         } else {
             // If still no dice, panic
             panic!("Definition not found");

@@ -330,19 +330,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "foufou"
-version = "0.1.0"
-dependencies = [
- "clap",
- "directories",
- "isahc",
- "regex",
- "rusqlite",
- "scraper",
- "tempfile",
-]
-
-[[package]]
 name = "futf"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -426,6 +413,19 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi 0.10.2+wasi-snapshot-preview1",
+]
+
+[[package]]
+name = "gloss-word"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "directories",
+ "isahc",
+ "regex",
+ "rusqlite",
+ "scraper",
+ "tempfile",
 ]
 
 [[package]]

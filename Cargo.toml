@@ -1,5 +1,5 @@
 [package]
-name = "foufou"
+name = "gloss-word"
 version = "0.1.0"
 authors = ["Theo Beers <theo.beers@fu-berlin.de>"]
 edition = "2018"
