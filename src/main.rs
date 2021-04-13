@@ -5,6 +5,7 @@ use std::{fs, str};
 
 use clap::{crate_version, App, Arg};
 use directories::ProjectDirs;
+use indicatif::{ProgressBar, ProgressStyle};
 use isahc::prelude::*;
 use regex::Regex;
 use rusqlite::{Connection, Result};
@@ -169,6 +170,16 @@ fn main() -> Result<(), isahc::Error> {
         lookup_url += &desired_word.replace(" ", "+");
     }
 
+    // Start a progress spinner
+    let pb = ProgressBar::new_spinner();
+    pb.enable_steady_tick(80);
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+            .template("{spinner} {msg}"),
+    );
+    pb.set_message("Fetching...");
+
     // Make the request
     let mut response = isahc::get(lookup_url)?;
 
@@ -315,10 +326,12 @@ fn main() -> Result<(), isahc::Error> {
         }
 
         // We still need to print results, of course
+        pb.finish_and_clear();
         print!("{}", final_output);
     } else {
         // If we didn't get an etymology result, stop here
         if etym_mode {
+            pb.finish_and_clear();
             panic!("Etymology not found");
         }
 
@@ -352,10 +365,12 @@ fn main() -> Result<(), isahc::Error> {
                 str::from_utf8(&pandoc.stdout).expect("Failed to convert Pandoc output to string");
 
             // Print an explanatory message, then the results
+            pb.finish_and_clear();
             print!("Did you mean:\n\n");
             print!("{}", pandoc_output);
         } else {
             // If still no dice, panic
+            pb.finish_and_clear();
             panic!("Definition not found");
         }
     }
