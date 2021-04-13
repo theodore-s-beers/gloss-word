@@ -28,10 +28,16 @@ fn main() -> Result<(), isahc::Error> {
         .author("Theo Beers <theo.beers@fu-berlin.de>")
         .about("A simple English dictionary lookup utility")
         .arg(
-            Arg::with_name("etym")
+            Arg::with_name("etymology")
                 .short("e")
                 .long("etymology")
                 .help("Search for etymology instead of definition"),
+        )
+        .arg(
+            Arg::with_name("fetch-update")
+                .short("f")
+                .long("fetch-update")
+                .help("Fetch new def./etym.; update cache if applicable"),
         )
         .arg(
             Arg::with_name("INPUT")
@@ -45,8 +51,9 @@ fn main() -> Result<(), isahc::Error> {
     // GLOBAL VARIABLES
     //
 
-    // Do we have the etymology flag?
-    let etym_mode: bool = matches.is_present("etym");
+    // Do we have flags?
+    let etym_mode: bool = matches.is_present("etymology");
+    let force_fetch = matches.is_present("fetch-update");
 
     // Take input and lowercase it
     // Is this ok to unwrap, or should I switch to expect?
@@ -55,6 +62,9 @@ fn main() -> Result<(), isahc::Error> {
     // Is the cache db available? Also set up a variable for its path
     let mut db_available = false;
     let mut db_path = PathBuf::new();
+
+    // Did we get a cache hit?
+    let mut cache_hit = false;
 
     //
     // CHECK FOR CACHED RESULT
@@ -107,10 +117,14 @@ fn main() -> Result<(), isahc::Error> {
                                 content: row.get(1)?,
                             })
                         }) {
-                            // If we got something, print it and return
+                            // If we got something, print and return (probably)
                             if let Some(actual_entry) = entry_iter.flatten().next() {
-                                print!("{}", actual_entry.content);
-                                return Ok(());
+                                cache_hit = true;
+
+                                if !force_fetch {
+                                    print!("{}", actual_entry.content);
+                                    return Ok(());
+                                }
                             }
                         }
                     }
@@ -142,10 +156,14 @@ fn main() -> Result<(), isahc::Error> {
                             content: row.get(1)?,
                         })
                     }) {
-                        // If we got something, print it and return
+                        // If we got something, print and return (probably)
                         if let Some(actual_entry) = entry_iter.flatten().next() {
-                            print!("{}", actual_entry.content);
-                            return Ok(());
+                            cache_hit = true;
+
+                            if !force_fetch {
+                                print!("{}", actual_entry.content);
+                                return Ok(());
+                            }
                         }
                     }
                 }
@@ -313,18 +331,32 @@ fn main() -> Result<(), isahc::Error> {
 
         // If the cache db proved available, try to reconnect and insert
         if db_available && etym_mode {
-            if let Ok(db_conn) = Connection::open(db_path) {
-                let _ = db_conn.execute(
-                    "INSERT INTO etymology (word, content) values (?1, ?2)",
-                    [&desired_word, &final_output],
-                );
+            if let Ok(db_conn) = Connection::open(&db_path) {
+                if force_fetch && cache_hit {
+                    let _ = db_conn.execute(
+                        "UPDATE etymology SET content = (?1) WHERE word = (?2)",
+                        [&final_output, &desired_word],
+                    );
+                } else {
+                    let _ = db_conn.execute(
+                        "INSERT INTO etymology (word, content) VALUES (?1, ?2)",
+                        [&desired_word, &final_output],
+                    );
+                }
             }
         } else if db_available {
-            if let Ok(db_conn) = Connection::open(db_path) {
-                let _ = db_conn.execute(
-                    "INSERT INTO dictionary (word, content) values (?1, ?2)",
-                    [&desired_word, &final_output],
-                );
+            if let Ok(db_conn) = Connection::open(&db_path) {
+                if force_fetch && cache_hit {
+                    let _ = db_conn.execute(
+                        "UPDATE dictionary SET content = (?1) WHERE word = (?2)",
+                        [&final_output, &desired_word],
+                    );
+                } else {
+                    let _ = db_conn.execute(
+                        "INSERT INTO dictionary (word, content) VALUES (?1, ?2)",
+                        [&desired_word, &final_output],
+                    );
+                }
             }
         }
 
@@ -369,7 +401,7 @@ fn main() -> Result<(), isahc::Error> {
 
             // Print an explanatory message, then the results
             pb.finish_and_clear();
-            print!("Did you mean:\n\n");
+            println!("Did you mean:\n");
             print!("{}", pandoc_output);
         } else {
             // If still no dice, panic
