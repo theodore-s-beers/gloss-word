@@ -219,8 +219,8 @@ fn main() -> Result<(), isahc::Error> {
 
         if etym_mode {
             // If etymology, just push everything from any sections
-            for item in section_vec.iter() {
-                results.push_str(&item.html());
+            for section in section_vec.iter() {
+                results.push_str(&section.html());
             }
         } else {
             // If definition, push selected elements from first/only section
@@ -253,10 +253,13 @@ fn main() -> Result<(), isahc::Error> {
                 .expect("Failed to convert Pandoc output to string");
 
             let re_quotes = Regex::new(r#"\\""#).unwrap();
-            let after = re_quotes.replace_all(&output_1, r#"""#).to_string();
+            let after_1 = re_quotes.replace_all(&output_1, r#"""#).to_string();
+
+            let re_figures = Regex::new(r#"(?m)\n\n!\[.+$"#).unwrap();
+            let after_2 = re_figures.replace_all(&after_1, "");
 
             let mut input_file_2 = NamedTempFile::new().expect("Failed to create tempfile");
-            write!(input_file_2, "{}", after).expect("Failed to write to tempfile");
+            write!(input_file_2, "{}", after_2).expect("Failed to write to tempfile");
 
             let pandoc_2 = Command::new("pandoc")
                 .arg(input_file_2.path())
