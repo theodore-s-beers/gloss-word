@@ -28,6 +28,11 @@ fn main() -> Result<(), isahc::Error> {
         .author("Theo Beers <theo.beers@fu-berlin.de>")
         .about("A simple English dictionary lookup utility")
         .arg(
+            Arg::with_name("clear-cache")
+                .long("clear-cache")
+                .help("Delete cache directory and its contents"),
+        )
+        .arg(
             Arg::with_name("etymology")
                 .short("e")
                 .long("etymology")
@@ -42,7 +47,7 @@ fn main() -> Result<(), isahc::Error> {
         .arg(
             Arg::with_name("INPUT")
                 .help("The word or phrase to look up")
-                .required(true)
+                .required_unless("clear-cache")
                 .index(1),
         )
         .get_matches();
@@ -52,12 +57,16 @@ fn main() -> Result<(), isahc::Error> {
     //
 
     // Do we have flags?
-    let etym_mode: bool = matches.is_present("etymology");
+    let clear_cache = matches.is_present("clear-cache");
+    let etym_mode = matches.is_present("etymology");
     let force_fetch = matches.is_present("fetch-update");
 
     // Take input and lowercase it
     // Is this ok to unwrap, or should I switch to expect?
-    let desired_word = matches.value_of("INPUT").unwrap().to_lowercase();
+    let mut desired_word = String::new();
+    if !clear_cache {
+        desired_word = matches.value_of("INPUT").unwrap().to_lowercase();
+    }
 
     // Is the cache db available? Also set up a variable for its path
     let mut db_available = false;
@@ -77,6 +86,14 @@ fn main() -> Result<(), isahc::Error> {
     if let Some(proj_dirs) = ProjectDirs::from("com", "theobeers", "gloss-word") {
         // This should give us a platform-appropriate cache directory
         let cache_dir = proj_dirs.cache_dir();
+
+        if clear_cache && cache_dir.exists() {
+            trash::delete(cache_dir).expect("Failed to delete cache directory");
+            return Ok(());
+        } else if clear_cache {
+            println!("Cache directory not found");
+            return Ok(());
+        }
 
         // If we don't have the cache dir yet, try to create it
         if !cache_dir.exists() {
@@ -254,23 +271,23 @@ fn main() -> Result<(), isahc::Error> {
 
         let mut final_output = String::new();
 
+        let mut pandoc_input = NamedTempFile::new().expect("Failed to create tempfile");
+        write!(pandoc_input, "{}", results).expect("Failed to write to tempfile");
+
+        let pandoc_1 = Command::new("pandoc")
+            .arg(pandoc_input.path())
+            .arg("-f")
+            .arg("html+smart-native_divs")
+            .arg("-t")
+            .arg("markdown")
+            .arg("--wrap=none")
+            .output()
+            .expect("Failed to execute Pandoc");
+
+        let output_1 =
+            str::from_utf8(&pandoc_1.stdout).expect("Failed to convert Pandoc output to string");
+
         if etym_mode {
-            let mut pandoc_input = NamedTempFile::new().expect("Failed to create tempfile");
-            write!(pandoc_input, "{}", results).expect("Failed to write to tempfile");
-
-            let pandoc_1 = Command::new("pandoc")
-                .arg(pandoc_input.path())
-                .arg("-f")
-                .arg("html+smart-native_divs")
-                .arg("-t")
-                .arg("markdown")
-                .arg("--wrap=none")
-                .output()
-                .expect("Failed to execute Pandoc");
-
-            let output_1 = str::from_utf8(&pandoc_1.stdout)
-                .expect("Failed to convert Pandoc output to string");
-
             let re_quotes = Regex::new(r#"\\""#).unwrap();
             let after_1 = re_quotes.replace_all(&output_1, r#"""#).to_string();
 
@@ -292,22 +309,6 @@ fn main() -> Result<(), isahc::Error> {
 
             final_output.push_str(output_2);
         } else {
-            let mut pandoc_input = NamedTempFile::new().expect("Failed to create tempfile");
-            write!(pandoc_input, "{}", results).expect("Failed to write to tempfile");
-
-            let pandoc_1 = Command::new("pandoc")
-                .arg(pandoc_input.path())
-                .arg("-f")
-                .arg("html+smart-native_divs")
-                .arg("-t")
-                .arg("markdown")
-                .arg("--wrap=none")
-                .output()
-                .expect("Failed to execute Pandoc");
-
-            let output_1 = str::from_utf8(&pandoc_1.stdout)
-                .expect("Failed to convert Pandoc output to string");
-
             let re_list_1 = Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap();
             let after_1 = re_list_1.replace_all(&output_1, "\n$a").to_string();
 
