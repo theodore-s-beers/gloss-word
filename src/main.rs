@@ -37,7 +37,7 @@ fn main() -> Result<(), isahc::Error> {
             Arg::with_name("fetch-update")
                 .short("f")
                 .long("fetch-update")
-                .help("Fetch new def./etym.; update cache if applicable"),
+                .help("Fetch new data; update cache if applicable"),
         )
         .arg(
             Arg::with_name("INPUT")
@@ -105,7 +105,7 @@ fn main() -> Result<(), isahc::Error> {
                     db_available = true;
 
                     // Set up query for possible cached result
-                    let mut query = String::from("SELECT * FROM etymology WHERE word='");
+                    let mut query = String::from("SELECT * FROM etymology WHERE word = '");
                     query.push_str(&desired_word);
                     query.push('\'');
 
@@ -144,7 +144,7 @@ fn main() -> Result<(), isahc::Error> {
                 db_available = true;
 
                 // Set up query for possible cached result
-                let mut query = String::from("SELECT * FROM dictionary WHERE word='");
+                let mut query = String::from("SELECT * FROM dictionary WHERE word = '");
                 query.push_str(&desired_word);
                 query.push('\'');
 
@@ -178,6 +178,7 @@ fn main() -> Result<(), isahc::Error> {
     // SCRAPING & CACHING
     //
 
+    // Build the relevant URL
     let mut lookup_url: String;
 
     if etym_mode {
@@ -230,7 +231,7 @@ fn main() -> Result<(), isahc::Error> {
     // Set up a few more selectors for desired elements (in definition mode)
     let element_selectors = Selector::parse("div.pseg, h2, hr.hmsep").unwrap();
 
-    // Check to see if we got the section we wanted
+    // Check to see if we got the section(s) we wanted
     if !section_vec.is_empty() {
         // Set up a string to hold results
         let mut results = String::new();
@@ -249,7 +250,7 @@ fn main() -> Result<(), isahc::Error> {
 
         // Update: now we're calling out to Pandoc from the Rust program
         // It still requires two runs, with regex replacement in between
-        // I'm using tempfiles to feed input to Pandoc
+        // Tempfiles are used to feed input to Pandoc
 
         let mut final_output = String::new();
 
@@ -329,7 +330,7 @@ fn main() -> Result<(), isahc::Error> {
             final_output.push_str(output_2);
         }
 
-        // If the cache db proved available, try to reconnect and insert
+        // Try to reconnect to cache db and insert or update
         if db_available && etym_mode {
             if let Ok(db_conn) = Connection::open(&db_path) {
                 if force_fetch && cache_hit {
@@ -361,13 +362,15 @@ fn main() -> Result<(), isahc::Error> {
         }
 
         // We still need to print results, of course
+        // Also clear the spinner
         pb.finish_and_clear();
         print!("{}", final_output);
     } else {
         // If we didn't get an etymology result, stop here
         if etym_mode {
             pb.finish_and_clear();
-            panic!("Etymology not found");
+            println!("Etymology not found");
+            return Ok(());
         }
 
         // In dictionary mode, we can check for a list of similar words
@@ -400,13 +403,14 @@ fn main() -> Result<(), isahc::Error> {
                 str::from_utf8(&pandoc.stdout).expect("Failed to convert Pandoc output to string");
 
             // Print an explanatory message, then the results
+            // Also clear the spinner
             pb.finish_and_clear();
             println!("Did you mean:\n");
             print!("{}", pandoc_output);
         } else {
-            // If still no dice, panic
+            // If still no dice...
             pb.finish_and_clear();
-            panic!("Definition not found");
+            println!("Definition not found");
         }
     }
 
