@@ -249,6 +249,7 @@ fn main() {
         pb.finish_and_clear();
         println!("Did you mean:\n");
         print!("{}", pandoc_output);
+        return;
     }
 
     // If still no dice...
