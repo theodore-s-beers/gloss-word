@@ -224,7 +224,7 @@ fn main() {
     // If we failed to get an etymology result, stop here
     if etym_mode {
         pb.finish_and_clear();
-        eprintln!("Etymology not found");
+        println!("Etymology not found");
         return;
     }
 
@@ -254,7 +254,7 @@ fn main() {
 
     // If still no dice...
     pb.finish_and_clear();
-    eprintln!("Definition not found");
+    println!("Definition not found");
 }
 
 fn get_document(lookup_url: String) -> Result<String, isahc::Error> {
@@ -407,9 +407,9 @@ fn query_db(
 fn trash_cache(cache_dir: &Path) -> Result<(), trash::Error> {
     if cache_dir.exists() {
         trash::delete(cache_dir)?;
-        eprintln!("Cache directory deleted");
+        println!("Cache directory deleted");
     } else {
-        eprintln!("Cache directory not found");
+        println!("Cache directory not found");
     }
 
     Ok(())
