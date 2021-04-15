@@ -114,7 +114,7 @@ fn main() {
             if force_fetch {
                 cache_hit = true
             } else {
-                println!("{}", entry);
+                print!("{}", entry);
                 return;
             }
         }
