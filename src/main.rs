@@ -1,8 +1,9 @@
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use std::{fs, str};
 
+use anyhow::{anyhow, Context};
 use clap::{crate_version, App, Arg};
 use directories::ProjectDirs;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -10,7 +11,6 @@ use isahc::prelude::*;
 use regex::Regex;
 use rusqlite::{Connection, Result};
 use scraper::{ElementRef, Html, Selector};
-use snafu::{ResultExt, Snafu};
 use tempfile::NamedTempFile;
 
 #[derive(Debug)]
@@ -19,21 +19,7 @@ struct Entry {
     content: String,
 }
 
-#[derive(Debug, Snafu)]
-enum MyError {
-    #[snafu(display("Failed to create tempfile: {}", source))]
-    CreateTempFile { source: std::io::Error },
-    #[snafu(display("Failed to convert Pandoc output to string: {}", source))]
-    OutputString { source: std::str::Utf8Error },
-    #[snafu(display("Failed to execute Pandoc: {}", source))]
-    RunPandoc { source: std::io::Error },
-    #[snafu(display("Failed to write to tempfile: {}", source))]
-    WriteTempFile { source: std::io::Error },
-}
-
-type MyResult<T, E = MyError> = std::result::Result<T, E>;
-
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
     //
     // CLI SETUP
     //
@@ -83,8 +69,9 @@ fn main() {
         desired_word = matches.value_of("INPUT").unwrap().to_lowercase();
     }
 
-    // What should be the path to the cache db?
+    // What should be the path to the cache db? Is the db accessible?
     let mut db_path = PathBuf::new();
+    let mut db_available = false;
 
     // Did we get a cache hit?
     let mut cache_hit = false;
@@ -96,9 +83,12 @@ fn main() {
     if let Some(proj_dirs) = ProjectDirs::from("com", "theobeers", "gloss-word") {
         let cache_dir = proj_dirs.cache_dir();
 
-        if clear_cache {
-            let _ = trash_cache(cache_dir);
-            return;
+        if clear_cache && cache_dir.exists() {
+            trash::delete(cache_dir)?;
+            eprintln!("Cache directory deleted");
+            return Ok(());
+        } else if clear_cache {
+            return Err(anyhow!("Cache directory not found"));
         }
 
         // If we don't have the cache dir yet, try to create it
@@ -112,22 +102,34 @@ fn main() {
     }
 
     //
-    // DB AVAILABILITY / SETUP
+    // DB SETUP & CHECK FOR CACHED RESULTS
     //
 
-    let db_available = open_db(&db_path).is_ok();
+    if let Ok(db_conn) = Connection::open(&db_path) {
+        db_available = true;
 
-    //
-    // CHECK FOR CACHED RESULT
-    //
+        let _ = db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS dictionary (
+                    word        TEXT UNIQUE NOT NULL,
+                    content     TEXT NOT NULL
+                )",
+            [],
+        );
 
-    if db_available {
-        if let Ok(entry) = query_db(&db_path, &desired_word, etym_mode) {
+        let _ = db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS etymology (
+                    word        TEXT UNIQUE NOT NULL,
+                    content     TEXT NOT NULL
+                )",
+            [],
+        );
+
+        if let Ok(entry) = query_db(db_conn, &desired_word, etym_mode) {
             if force_fetch {
                 cache_hit = true
             } else {
                 print!("{}", entry);
-                return;
+                return Ok(());
             }
         }
     }
@@ -159,15 +161,13 @@ fn main() {
         lookup_url += &desired_word.replace(" ", "+");
     }
 
-    // Get document text
-    let response_text = match get_document(lookup_url) {
-        Ok(document) => document,
-        Err(e) => {
-            pb.finish_and_clear();
-            eprintln!("Error: {}", e);
-            return;
-        }
-    };
+    // Make the request
+    let mut response = isahc::get(lookup_url).context("Failed to complete HTTP request")?;
+
+    // Get the document text
+    let response_text = response
+        .text()
+        .context("Failed to read HTTP response body to string")?;
 
     // Set up a regex to split the document, in definition mode
     // In etymology mode, this shouldn't do anything
@@ -213,14 +213,7 @@ fn main() {
         }
 
         // Call out to Pandoc
-        let final_output = match pandoc_primary(etym_mode, results) {
-            Ok(output) => output,
-            Err(e) => {
-                pb.finish_and_clear();
-                eprintln!("{}", e);
-                return;
-            }
-        };
+        let final_output = pandoc_primary(etym_mode, results)?;
 
         // Try to cache result
         if db_available {
@@ -238,7 +231,7 @@ fn main() {
         // Also clear the spinner
         pb.finish_and_clear();
         print!("{}", final_output);
-        return;
+        return Ok(());
     }
 
     // Moving on...
@@ -250,8 +243,7 @@ fn main() {
     // If we failed to get an etymology result, stop here
     if etym_mode {
         pb.finish_and_clear();
-        eprintln!("Etymology not found");
-        return;
+        return Err(anyhow!("Etymology not found"));
     }
 
     // In dictionary mode, we can check for a list of similar words
@@ -268,63 +260,24 @@ fn main() {
         }
 
         // Call out to Pandoc
-        let pandoc_output = match pandoc_fallback(results) {
-            Ok(output) => output,
-            Err(e) => {
-                pb.finish_and_clear();
-                eprintln!("{}", e);
-                return;
-            }
-        };
+        let pandoc_output = pandoc_fallback(results)?;
 
         // Print an explanatory message, then the results
         // Also clear the spinner
         pb.finish_and_clear();
         println!("Did you mean:\n");
         print!("{}", pandoc_output);
-        return;
+        return Ok(());
     }
 
     // If still no dice...
     pb.finish_and_clear();
-    eprintln!("Definition not found");
+    Err(anyhow!("Definition not found"))
 }
 
-fn get_document(lookup_url: String) -> Result<String, isahc::Error> {
-    // Make the request
-    let mut response = isahc::get(lookup_url)?;
-
-    // Get the document text
-    let response_text = response.text()?;
-
-    Ok(response_text)
-}
-
-fn open_db(db_path: &Path) -> Result<(), rusqlite::Error> {
-    let db_conn = Connection::open(db_path)?;
-
-    db_conn.execute(
-        "CREATE TABLE IF NOT EXISTS dictionary (
-                word        TEXT UNIQUE NOT NULL,
-                content     TEXT NOT NULL
-            )",
-        [],
-    )?;
-
-    db_conn.execute(
-        "CREATE TABLE IF NOT EXISTS etymology (
-                word        TEXT UNIQUE NOT NULL,
-                content     TEXT NOT NULL
-            )",
-        [],
-    )?;
-
-    Ok(())
-}
-
-fn pandoc_fallback(results: String) -> MyResult<String> {
-    let mut pandoc_input = NamedTempFile::new().context(CreateTempFile)?;
-    write!(pandoc_input, "{}", results).context(WriteTempFile)?;
+fn pandoc_fallback(results: String) -> Result<String, anyhow::Error> {
+    let mut pandoc_input = NamedTempFile::new().context("Failed to create tempfile")?;
+    write!(pandoc_input, "{}", results).context("Failed to write to tempfile")?;
 
     let pandoc = Command::new("pandoc")
         .arg(pandoc_input.path())
@@ -333,18 +286,19 @@ fn pandoc_fallback(results: String) -> MyResult<String> {
         .arg("-t")
         .arg("plain")
         .output()
-        .context(RunPandoc)?;
+        .context("Failed to execute Pandoc")?;
 
-    let pandoc_output = str::from_utf8(&pandoc.stdout).context(OutputString)?;
+    let pandoc_output =
+        str::from_utf8(&pandoc.stdout).context("Failed to convert Pandoc output to string")?;
 
     Ok(pandoc_output.to_string())
 }
 
-fn pandoc_primary(etym_mode: bool, results: String) -> MyResult<String> {
+fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Error> {
     let mut final_output = String::new();
 
-    let mut pandoc_input = NamedTempFile::new().context(CreateTempFile)?;
-    write!(pandoc_input, "{}", results).context(WriteTempFile)?;
+    let mut pandoc_input = NamedTempFile::new().context("Failed to create tempfile")?;
+    write!(pandoc_input, "{}", results).context("Failed to write to tempfile")?;
 
     let pandoc_1 = Command::new("pandoc")
         .arg(pandoc_input.path())
@@ -354,9 +308,10 @@ fn pandoc_primary(etym_mode: bool, results: String) -> MyResult<String> {
         .arg("markdown")
         .arg("--wrap=none")
         .output()
-        .context(RunPandoc)?;
+        .context("Failed to execute Pandoc")?;
 
-    let output_1 = str::from_utf8(&pandoc_1.stdout).context(OutputString)?;
+    let output_1 =
+        str::from_utf8(&pandoc_1.stdout).context("Failed to convert Pandoc output to string")?;
 
     if etym_mode {
         let re_quotes = Regex::new(r#"\\""#).unwrap();
@@ -365,17 +320,18 @@ fn pandoc_primary(etym_mode: bool, results: String) -> MyResult<String> {
         let re_figures = Regex::new(r#"(?m)\n\n!\[.+$"#).unwrap();
         let after_2 = re_figures.replace_all(&after_1, "");
 
-        let mut input_file_2 = NamedTempFile::new().context(CreateTempFile)?;
-        write!(input_file_2, "{}", after_2).context(WriteTempFile)?;
+        let mut input_file_2 = NamedTempFile::new().context("Failed to create tempfile")?;
+        write!(input_file_2, "{}", after_2).context("Failed to write to tempfile")?;
 
         let pandoc_2 = Command::new("pandoc")
             .arg(input_file_2.path())
             .arg("-t")
             .arg("plain")
             .output()
-            .context(RunPandoc)?;
+            .context("Failed to execute Pandoc")?;
 
-        let output_2 = str::from_utf8(&pandoc_2.stdout).context(OutputString)?;
+        let output_2 = str::from_utf8(&pandoc_2.stdout)
+            .context("Failed to convert Pandoc output to string")?;
 
         final_output.push_str(output_2);
     } else {
@@ -385,17 +341,18 @@ fn pandoc_primary(etym_mode: bool, results: String) -> MyResult<String> {
         let re_list_2 = Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
         let after_2 = re_list_2.replace_all(&after_1, "\n    $b").to_string();
 
-        let mut input_file_2 = NamedTempFile::new().context(CreateTempFile)?;
-        write!(input_file_2, "{}", after_2).context(WriteTempFile)?;
+        let mut input_file_2 = NamedTempFile::new().context("Failed to create tempfile")?;
+        write!(input_file_2, "{}", after_2).context("Failed to write to tempfile")?;
 
         let pandoc_2 = Command::new("pandoc")
             .arg(input_file_2.path())
             .arg("-t")
             .arg("plain")
             .output()
-            .context(RunPandoc)?;
+            .context("Failed to execute Pandoc")?;
 
-        let output_2 = str::from_utf8(&pandoc_2.stdout).context(OutputString)?;
+        let output_2 = str::from_utf8(&pandoc_2.stdout)
+            .context("Failed to convert Pandoc output to string")?;
 
         final_output.push_str(output_2);
     }
@@ -404,12 +361,10 @@ fn pandoc_primary(etym_mode: bool, results: String) -> MyResult<String> {
 }
 
 fn query_db(
-    db_path: &Path,
+    db_conn: Connection,
     desired_word: &str,
     etym_mode: bool,
 ) -> Result<String, rusqlite::Error> {
-    let db_conn = Connection::open(db_path)?;
-
     let mut query = String::new();
 
     if etym_mode {
@@ -431,17 +386,6 @@ fn query_db(
     })?;
 
     Ok(entry.content)
-}
-
-fn trash_cache(cache_dir: &Path) -> Result<(), trash::Error> {
-    if cache_dir.exists() {
-        trash::delete(cache_dir)?;
-        eprintln!("Cache directory deleted");
-    } else {
-        eprintln!("Cache directory not found");
-    }
-
-    Ok(())
 }
 
 fn update_cache(
