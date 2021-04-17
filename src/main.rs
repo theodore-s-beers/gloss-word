@@ -68,8 +68,7 @@ fn main() {
         desired_word = matches.value_of("INPUT").unwrap().to_lowercase();
     }
 
-    // Is the cache db available? Also set up a variable for its path
-    let mut db_available = false;
+    // What should be the path to the cache db?
     let mut db_path = PathBuf::new();
 
     // Did we get a cache hit?
@@ -101,9 +100,7 @@ fn main() {
     // DB AVAILABILITY / SETUP
     //
 
-    if open_db(&db_path).is_ok() {
-        db_available = true;
-    }
+    let db_available = open_db(&db_path).is_ok();
 
     //
     // CHECK FOR CACHED RESULT
@@ -148,7 +145,14 @@ fn main() {
     }
 
     // Get document text
-    let response_text = get_document(lookup_url).expect("Failed to fetch document");
+    let response_text = match get_document(lookup_url) {
+        Ok(document) => document,
+        Err(e) => {
+            pb.finish_and_clear();
+            println!("Error: {}", e);
+            return;
+        }
+    };
 
     // Set up a regex to split the document, in definition mode
     // In etymology mode, this shouldn't do anything
