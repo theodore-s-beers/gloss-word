@@ -161,11 +161,9 @@ fn main() -> Result<(), anyhow::Error> {
         lookup_url += &desired_word.replace(" ", "+");
     }
 
-    // Make the request
-    let mut response = isahc::get(lookup_url).context("Failed to complete HTTP request")?;
-
-    // Get the document text
-    let response_text = response
+    // Make request and read response body into string
+    let response_text = isahc::get(lookup_url)
+        .context("Failed to complete HTTP request")?
         .text()
         .context("Failed to read HTTP response body to string")?;
 
