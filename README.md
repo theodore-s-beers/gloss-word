@@ -38,7 +38,10 @@ appealed to me.
 
 ```sh
 gloss() {
-  command gloss "$@" | bat --style=grid,numbers
+  (
+    set -o pipefail
+    command gloss "$@" | bat --style=grid,numbers
+  )
 }
 ```
 
