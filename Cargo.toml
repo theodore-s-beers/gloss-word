@@ -3,6 +3,13 @@ name = "gloss-word"
 version = "0.1.0"
 authors = ["Theo Beers <theo.beers@fu-berlin.de>"]
 edition = "2018"
+categories = ["command-line-utilities"]
+description = "A simple English dictionary lookup utility"
+homepage = "https://github.com/theodore-s-beers/gloss-word"
+keywords = ["definition", "dictionary", "etymology"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/theodore-s-beers/gloss-word"
 
 [dependencies]
 anyhow = "1.0.40"
