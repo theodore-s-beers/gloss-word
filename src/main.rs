@@ -80,9 +80,11 @@ fn main() -> Result<(), anyhow::Error> {
     // CACHE DIRECTORY
     //
 
+    // Most operations here can fail silently; caching is optional
     if let Some(proj_dirs) = ProjectDirs::from("com", "theobeers", "gloss-word") {
         let cache_dir = proj_dirs.cache_dir();
 
+        // If we have clear-cache flag, handle it and return
         if clear_cache && cache_dir.exists() {
             trash::delete(cache_dir)?;
             eprintln!("Cache directory deleted");
@@ -105,9 +107,12 @@ fn main() -> Result<(), anyhow::Error> {
     // DB SETUP & CHECK FOR CACHED RESULTS
     //
 
+    // Again, these operations can fail silently
     if let Ok(db_conn) = Connection::open(&db_path) {
+        // Mark db available for later use
         db_available = true;
 
+        // Create both tables, if they don't exist
         let _ = db_conn.execute(
             "CREATE TABLE IF NOT EXISTS dictionary (
                     word        TEXT UNIQUE NOT NULL,
@@ -124,6 +129,7 @@ fn main() -> Result<(), anyhow::Error> {
             [],
         );
 
+        // If we got a cache hit, handle it (usually print and return)
         if let Ok(entry) = query_db(db_conn, &desired_word, etym_mode) {
             if force_fetch {
                 cache_hit = true
@@ -213,7 +219,7 @@ fn main() -> Result<(), anyhow::Error> {
         // Call out to Pandoc
         let final_output = pandoc_primary(etym_mode, results)?;
 
-        // Try to cache result
+        // Try to cache result; this can fail silently
         if db_available {
             let _ = update_cache(
                 cache_hit,
@@ -250,7 +256,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Again, see if we got anything
     if !suggestions_vec.is_empty() {
-        // If so, collect results
+        // If so, collect results and push to string
         let mut results = String::new();
 
         for element in suggestions_vec.iter() {
@@ -273,7 +279,9 @@ fn main() -> Result<(), anyhow::Error> {
     Err(anyhow!("Definition not found"))
 }
 
+// Function to call Pandoc in case of suggested alternate words
 fn pandoc_fallback(results: String) -> Result<String, anyhow::Error> {
+    // Write results string into a tempfile to pass to Pandoc
     let mut pandoc_input = NamedTempFile::new().context("Failed to create tempfile")?;
     write!(pandoc_input, "{}", results).context("Failed to write to tempfile")?;
 
@@ -286,20 +294,23 @@ fn pandoc_fallback(results: String) -> Result<String, anyhow::Error> {
         .output()
         .context("Failed to execute Pandoc")?;
 
-    let pandoc_output =
-        str::from_utf8(&pandoc.stdout).context("Failed to convert Pandoc output to string")?;
+    let pandoc_output = str::from_utf8(&pandoc.stdout)
+        .context("Failed to convert Pandoc output to string")?
+        .to_string();
 
-    Ok(pandoc_output.to_string())
+    Ok(pandoc_output)
 }
 
+// Main Pandoc function
 fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Error> {
-    let mut final_output = String::new();
+    let final_output: String;
 
-    let mut pandoc_input = NamedTempFile::new().context("Failed to create tempfile")?;
-    write!(pandoc_input, "{}", results).context("Failed to write to tempfile")?;
+    // Write results string into a tempfile to pass to Pandoc
+    let mut input_file_1 = NamedTempFile::new().context("Failed to create tempfile")?;
+    write!(input_file_1, "{}", results).context("Failed to write to tempfile")?;
 
     let pandoc_1 = Command::new("pandoc")
-        .arg(pandoc_input.path())
+        .arg(input_file_1.path())
         .arg("-f")
         .arg("html+smart-native_divs")
         .arg("-t")
@@ -308,16 +319,22 @@ fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Er
         .output()
         .context("Failed to execute Pandoc")?;
 
+    // Take first Pandoc output as a string
     let output_1 =
         str::from_utf8(&pandoc_1.stdout).context("Failed to convert Pandoc output to string")?;
 
+    // Make regex replacements, depending on search mode
     if etym_mode {
+        // This just un-escapes double quotes
+        // Don't know why Pandoc is outputting these, anyway
         let re_quotes = Regex::new(r#"\\""#).unwrap();
         let after_1 = re_quotes.replace_all(&output_1, r#"""#).to_string();
 
+        // And this is to remove any figures
         let re_figures = Regex::new(r#"(?m)\n\n!\[.+$"#).unwrap();
         let after_2 = re_figures.replace_all(&after_1, "");
 
+        // Adjusted output is written to a second tempfile for Pandoc
         let mut input_file_2 = NamedTempFile::new().context("Failed to create tempfile")?;
         write!(input_file_2, "{}", after_2).context("Failed to write to tempfile")?;
 
@@ -328,17 +345,20 @@ fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Er
             .output()
             .context("Failed to execute Pandoc")?;
 
-        let output_2 = str::from_utf8(&pandoc_2.stdout)
-            .context("Failed to convert Pandoc output to string")?;
-
-        final_output.push_str(output_2);
+        // Set final output
+        final_output = str::from_utf8(&pandoc_2.stdout)
+            .context("Failed to convert Pandoc output to string")?
+            .to_string();
     } else {
+        // Un-bold numbered list labels
         let re_list_1 = Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap();
         let after_1 = re_list_1.replace_all(&output_1, "\n$a").to_string();
 
+        // Un-bold and indent lettered list labels
         let re_list_2 = Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
         let after_2 = re_list_2.replace_all(&after_1, "\n    $b").to_string();
 
+        // Adjusted output is written to a second tempfile for Pandoc
         let mut input_file_2 = NamedTempFile::new().context("Failed to create tempfile")?;
         write!(input_file_2, "{}", after_2).context("Failed to write to tempfile")?;
 
@@ -349,15 +369,16 @@ fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Er
             .output()
             .context("Failed to execute Pandoc")?;
 
-        let output_2 = str::from_utf8(&pandoc_2.stdout)
-            .context("Failed to convert Pandoc output to string")?;
-
-        final_output.push_str(output_2);
+        // Set final output
+        final_output = str::from_utf8(&pandoc_2.stdout)
+            .context("Failed to convert Pandoc output to string")?
+            .to_string();
     }
 
     Ok(final_output)
 }
 
+// Function to query db for cached results
 fn query_db(
     db_conn: Connection,
     desired_word: &str,
@@ -365,6 +386,7 @@ fn query_db(
 ) -> Result<String, rusqlite::Error> {
     let mut query = String::new();
 
+    // Construct query as appropriate
     if etym_mode {
         query.push_str("SELECT * FROM etymology WHERE word = '");
     } else {
@@ -376,6 +398,7 @@ fn query_db(
 
     let mut stmt = db_conn.prepare(&query)?;
 
+    // We're only looking for one row
     let entry = stmt.query_row([], |row| {
         Ok(Entry {
             word: row.get(0)?,
@@ -386,6 +409,7 @@ fn query_db(
     Ok(entry.content)
 }
 
+// Function to try to update cache with new results
 fn update_cache(
     cache_hit: bool,
     db_path: PathBuf,
@@ -394,8 +418,10 @@ fn update_cache(
     final_output: &str,
     force_fetch: bool,
 ) -> Result<(), rusqlite::Error> {
+    // Yes, this means a second db connection; I don't think it's so bad
     let db_conn = Connection::open(&db_path)?;
 
+    // If we have force-fetch flag and got a cache hit, update
     if force_fetch && cache_hit {
         if etym_mode {
             db_conn.execute(
@@ -408,6 +434,7 @@ fn update_cache(
                 [final_output, desired_word],
             )?;
         }
+    // Else insert
     } else if etym_mode {
         db_conn.execute(
             "INSERT INTO etymology (word, content) VALUES (?1, ?2)",

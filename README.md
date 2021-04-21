@@ -7,10 +7,10 @@ as provided by the website of
 [The Free Dictionary](https://www.thefreedictionary.com/). Etymologies are
 pulled from the [Online Etymology Dictionary](https://www.etymonline.com/).
 
-While the package is called `gloss-word`—since I may publish it to
-[crates.io](https://crates.io/) and need a unique name—the binary itself, and
-hence the command, is `gloss`. I like to use a shell function to pipe the output
-to [`bat`](https://github.com/sharkdp/bat) for pretty-printing. That's pasted
+While the package is called `gloss-word`—since I needed a unique name to publish
+it to [crates.io](https://crates.io/)—the binary itself, and hence the command,
+is `gloss`. I like to use a shell function to pipe the output to
+[`bat`](https://github.com/sharkdp/bat) for pretty-printing. That's pasted
 below.
 
 In short, the program makes a request (if necessary) to the appropriate website;
@@ -19,10 +19,10 @@ text with [Pandoc](https://github.com/jgm/pandoc); and prints it to `stdout`.
 Results are cached in a rudimentary manner, so that repeat searches—however
 unlikely they may be—will not require fetching from TFD or Etymonline.
 
-Pandoc is a required external dependency. Everything else is handled by the Rust
-binary. I should note, however, that I wrote this program for my own use on
-macOS, and I haven't yet tested it on Windows or Linux. I'm sure that some
-adjustments will be necessary.
+**Pandoc is a required external dependency.** Everything else is handled by the
+Rust binary. I should note, however, that I wrote this program for my own use on
+macOS, and I've tested it only lightly on Windows (seems fine), and not at all
+on Linux. It's possible that some adjustments will be necessary.
 
 Cached results are in the form of a basic SQLite database, in what is supposed
 to be a platform-appropriate location (relying on the
