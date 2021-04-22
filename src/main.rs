@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -301,6 +302,27 @@ fn pandoc_fallback(results: String) -> Result<String, anyhow::Error> {
     Ok(pandoc_output)
 }
 
+// Function to convert to plain text with Pandoc, as a final step
+// This used to be duplicated in pandoc_primary, but jscpd was complaining
+fn pandoc_plain(input: Cow<str>) -> Result<String, anyhow::Error> {
+    // String is again written to a tempfile for Pandoc
+    let mut input_file = NamedTempFile::new().context("Failed to create tempfile")?;
+    write!(input_file, "{}", input).context("Failed to write to tempfile")?;
+
+    let pandoc = Command::new("pandoc")
+        .arg(input_file.path())
+        .arg("-t")
+        .arg("plain")
+        .output()
+        .context("Failed to execute Pandoc")?;
+
+    let output = str::from_utf8(&pandoc.stdout)
+        .context("Failed to convert Pandoc output to string")?
+        .to_string();
+
+    Ok(output)
+}
+
 // Main Pandoc function
 fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Error> {
     let final_output: String;
@@ -328,51 +350,25 @@ fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Er
         // This just un-escapes double quotes
         // Don't know why Pandoc is outputting these, anyway
         let re_quotes = Regex::new(r#"\\""#).unwrap();
-        let after_1 = re_quotes.replace_all(&output_1, r#"""#).to_string();
+        let after_1 = re_quotes.replace_all(output_1, r#"""#);
 
         // And this is to remove any figures
         let re_figures = Regex::new(r#"(?m)\n\n!\[.+$"#).unwrap();
         let after_2 = re_figures.replace_all(&after_1, "");
 
-        // Adjusted output is written to a second tempfile for Pandoc
-        let mut input_file_2 = NamedTempFile::new().context("Failed to create tempfile")?;
-        write!(input_file_2, "{}", after_2).context("Failed to write to tempfile")?;
-
-        let pandoc_2 = Command::new("pandoc")
-            .arg(input_file_2.path())
-            .arg("-t")
-            .arg("plain")
-            .output()
-            .context("Failed to execute Pandoc")?;
-
-        // Set final output
-        final_output = str::from_utf8(&pandoc_2.stdout)
-            .context("Failed to convert Pandoc output to string")?
-            .to_string();
+        // Get final output
+        final_output = pandoc_plain(after_2)?;
     } else {
         // Un-bold numbered list labels
         let re_list_1 = Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap();
-        let after_1 = re_list_1.replace_all(&output_1, "\n$a").to_string();
+        let after_1 = re_list_1.replace_all(output_1, "\n$a");
 
         // Un-bold and indent lettered list labels
         let re_list_2 = Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
-        let after_2 = re_list_2.replace_all(&after_1, "\n    $b").to_string();
+        let after_2 = re_list_2.replace_all(&after_1, "\n    $b");
 
-        // Adjusted output is written to a second tempfile for Pandoc
-        let mut input_file_2 = NamedTempFile::new().context("Failed to create tempfile")?;
-        write!(input_file_2, "{}", after_2).context("Failed to write to tempfile")?;
-
-        let pandoc_2 = Command::new("pandoc")
-            .arg(input_file_2.path())
-            .arg("-t")
-            .arg("plain")
-            .output()
-            .context("Failed to execute Pandoc")?;
-
-        // Set final output
-        final_output = str::from_utf8(&pandoc_2.stdout)
-            .context("Failed to convert Pandoc output to string")?
-            .to_string();
+        // Get final output
+        final_output = pandoc_plain(after_2)?;
     }
 
     Ok(final_output)
@@ -419,7 +415,7 @@ fn update_cache(
     force_fetch: bool,
 ) -> Result<(), rusqlite::Error> {
     // Yes, this means a second db connection; I don't think it's so bad
-    let db_conn = Connection::open(&db_path)?;
+    let db_conn = Connection::open(db_path)?;
 
     // If we have force-fetch flag and got a cache hit, update
     if force_fetch && cache_hit {
