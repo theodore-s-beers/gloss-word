@@ -347,14 +347,14 @@ fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Er
 
     // Make regex replacements, depending on search mode
     if etym_mode {
+        // This is to remove any figures
+        let re_figures = Regex::new(r"(?m)\n\n!\[.+$").unwrap();
+        let after_1 = re_figures.replace_all(output_1, "");
+
         // This just un-escapes double quotes
         // Don't know why Pandoc is outputting these, anyway
         let re_quotes = Regex::new(r#"\\""#).unwrap();
-        let after_1 = re_quotes.replace_all(output_1, r#"""#);
-
-        // And this is to remove any figures
-        let re_figures = Regex::new(r#"(?m)\n\n!\[.+$"#).unwrap();
-        let after_2 = re_figures.replace_all(&after_1, "");
+        let after_2 = re_quotes.replace_all(&after_1, r#"""#);
 
         // Get final output
         final_output = pandoc_plain(after_2)?;
@@ -367,8 +367,13 @@ fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Er
         let re_list_2 = Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
         let after_2 = re_list_2.replace_all(&after_1, "\n    $b");
 
+        // This just un-escapes double quotes
+        // Don't know why Pandoc is outputting these, anyway
+        let re_quotes = Regex::new(r#"\\""#).unwrap();
+        let after_3 = re_quotes.replace_all(&after_2, r#"""#);
+
         // Get final output
-        final_output = pandoc_plain(after_2)?;
+        final_output = pandoc_plain(after_3)?;
     }
 
     Ok(final_output)
