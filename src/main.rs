@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -174,13 +173,10 @@ fn main() -> Result<(), anyhow::Error> {
         .text()
         .context("Failed to read HTTP response body to string")?;
 
-    // Set up a regex to split the document, in definition mode
-    // In etymology mode, this shouldn't do anything
-    let re_thesaurus = Regex::new(r#"<div id="Thesaurus">"#).unwrap();
-
-    // Split document (if applicable)
+    // In definition mode, split the document
     // Otherwise we could blow a bunch of time parsing the whole thing
-    let chunks: Vec<&str> = re_thesaurus.split(&response_text).collect();
+    // In etymology mode, this shouldn't do anything
+    let chunks: Vec<&str> = response_text.split(r#"<div id="Thesaurus">"#).collect();
 
     // Parse the first chunk, which is the one we want
     // For an etymology entry, the "first chunk" is the whole document
@@ -304,7 +300,7 @@ fn pandoc_fallback(results: String) -> Result<String, anyhow::Error> {
 
 // Function to convert to plain text with Pandoc, as a final step
 // This used to be duplicated in pandoc_primary, but jscpd was complaining
-fn pandoc_plain(input: Cow<str>) -> Result<String, anyhow::Error> {
+fn pandoc_plain(input: String) -> Result<String, anyhow::Error> {
     // String is again written to a tempfile for Pandoc
     let mut input_file = NamedTempFile::new().context("Failed to create tempfile")?;
     write!(input_file, "{}", input).context("Failed to write to tempfile")?;
@@ -345,7 +341,7 @@ fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Er
     let output_1 =
         str::from_utf8(&pandoc_1.stdout).context("Failed to convert Pandoc output to string")?;
 
-    // Make regex replacements, depending on search mode
+    // Make regex (and simple text) replacements, depending on search mode
     if etym_mode {
         // This is to remove any figures
         let re_figures = Regex::new(r"(?m)\n\n!\[.+$").unwrap();
@@ -353,8 +349,7 @@ fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Er
 
         // This just un-escapes double quotes
         // Don't know why Pandoc is outputting these, anyway
-        let re_quotes = Regex::new(r#"\\""#).unwrap();
-        let after_2 = re_quotes.replace_all(&after_1, r#"""#);
+        let after_2 = after_1.replace(r#"\\""#, r#"""#);
 
         // Get final output
         final_output = pandoc_plain(after_2)?;
@@ -369,8 +364,7 @@ fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Er
 
         // This just un-escapes double quotes
         // Don't know why Pandoc is outputting these, anyway
-        let re_quotes = Regex::new(r#"\\""#).unwrap();
-        let after_3 = re_quotes.replace_all(&after_2, r#"""#);
+        let after_3 = after_2.replace(r#"\\""#, r#"""#);
 
         // Get final output
         final_output = pandoc_plain(after_3)?;
