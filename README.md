@@ -50,4 +50,4 @@ gloss() {
 
 ## asciicast
 
-[![asciicast](https://asciinema.org/a/Ql4koMsU9b4wqAYLE4fsLTtwM.svg)](https://asciinema.org/a/Ql4koMsU9b4wqAYLE4fsLTtwM)
+[![asciicast](https://asciinema.org/a/K8Dp5YncS2qVRL9965ayESTDC.svg)](https://asciinema.org/a/K8Dp5YncS2qVRL9965ayESTDC)
