@@ -15,7 +15,7 @@ use tempfile::NamedTempFile;
 
 #[derive(Debug)]
 struct Entry {
-    word: String,
+    _word: String,
     content: String,
 }
 
@@ -396,7 +396,7 @@ fn query_db(
     // We're only looking for one row
     let entry = stmt.query_row([], |row| {
         Ok(Entry {
-            word: row.get(0)?,
+            _word: row.get(0)?,
             content: row.get(1)?,
         })
     })?;
