@@ -11,13 +11,10 @@ name: Lint Code Base
 # https://help.github.com/en/articles/workflow-syntax-for-github-actions
 #
 
-#############################
-# Start the job on all push #
-#############################
+###########################
+# Start job on PR to main #
+###########################
 on:
-  push:
-    branches-ignore: [main]
-    # Remove the line above to run when pushing to main
   pull_request:
     branches: [main]
 

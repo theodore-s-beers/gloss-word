@@ -10,8 +10,7 @@ pulled from the [Online Etymology Dictionary](https://www.etymonline.com/).
 While the package is called `gloss-word`—since I needed a unique name to publish
 it to [crates.io](https://crates.io/)—the binary itself, and hence the command,
 is `gloss`. I like to use a shell function to pipe the output to
-[`bat`](https://github.com/sharkdp/bat) for pretty-printing. That's pasted
-below.
+[bat](https://github.com/sharkdp/bat) for pretty-printing. That's pasted below.
 
 In short, the program makes a request (if necessary) to the appropriate website;
 scrapes relevant HTML elements; converts that material to nicely formatted plain
@@ -26,7 +25,7 @@ on Linux. It's possible that some adjustments will be necessary.
 
 Cached results are in the form of a basic SQLite database, in what is supposed
 to be a platform-appropriate location (relying on the
-[`directories`](https://github.com/dirs-dev/directories-rs) library).
+[directories](https://github.com/dirs-dev/directories-rs) library).
 
 Answers to a few other potential questions: _Why scrape from TFD, as opposed to
 other good dictionary sites?_ I actually tried Wiktionary first, but their
@@ -45,8 +44,8 @@ gloss() {
 }
 ```
 
-[`bat`](https://github.com/sharkdp/bat) is a Rust quasi-reimplementation of
-`cat`, which I enjoy. You might also like to give it a try.
+[bat](https://github.com/sharkdp/bat) is a Rust quasi-reimplementation of `cat`,
+which I enjoy. You might also like to give it a try.
 
 ## asciicast
 
