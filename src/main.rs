@@ -184,7 +184,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Set up a selector for the relevant section
     let section_selector = match etym_mode {
-        true => Selector::parse(r#"div[class^="word--"]"#).unwrap(),
+        true => Selector::parse(r#"div[class^="word--"]:not([class*="word_4pc"])"#).unwrap(),
         _ => Selector::parse(r#"div#Definition section[data-src="hm"]"#).unwrap(),
     };
 
