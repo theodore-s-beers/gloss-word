@@ -13,8 +13,8 @@ repository = "https://github.com/theodore-s-beers/gloss-word"
 exclude = ["og.png"]
 
 [dependencies]
-anyhow = "1.0.48"
-clap = "2.33.3"
+anyhow = "1.0.51"
+clap = "2.34.0"
 directories = "4.0.1"
 indicatif = "0.16.2"
 isahc = "1.6.0"
