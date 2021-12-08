@@ -24,7 +24,7 @@ tempfile = "3.2.0"
 trash = "2.0.2"
 
 [dependencies.rusqlite]
-version = "0.26.1"
+version = "0.26.2"
 features = ["bundled"]
 
 [[bin]]
