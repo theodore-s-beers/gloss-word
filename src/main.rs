@@ -161,10 +161,10 @@ fn main() -> Result<(), anyhow::Error> {
 
     if etym_mode {
         lookup_url = "https://www.etymonline.com/word/".to_string();
-        lookup_url += &desired_word.replace(" ", "%20");
+        lookup_url += &desired_word.replace(' ', "%20");
     } else {
         lookup_url = "https://www.thefreedictionary.com/".to_string();
-        lookup_url += &desired_word.replace(" ", "+");
+        lookup_url += &desired_word.replace(' ', "+");
     }
 
     // Make request and read response body into string
