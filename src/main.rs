@@ -321,6 +321,7 @@ fn pandoc_plain(input: String) -> Result<String, anyhow::Error> {
 
 // Main Pandoc function
 fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Error> {
+    #[allow(clippy::needless_late_init)]
     let final_output: String;
 
     // Write results string into a tempfile to pass to Pandoc
