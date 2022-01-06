@@ -14,7 +14,7 @@ exclude = ["og.png"]
 
 [dependencies]
 anyhow = "1.0.51"
-clap = "2.34.0"
+clap = "3.0.5"
 directories = "4.0.1"
 indicatif = "0.16.2"
 isahc = "1.6.0"
