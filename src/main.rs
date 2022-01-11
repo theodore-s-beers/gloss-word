@@ -29,26 +29,26 @@ fn main() -> Result<(), anyhow::Error> {
         .author("Theo Beers <theo.beers@fu-berlin.de>")
         .about("A simple English dictionary lookup utility")
         .arg(
-            Arg::with_name("clear-cache")
+            Arg::new("clear-cache")
                 .long("clear-cache")
                 .help("Delete cache directory and its contents"),
         )
         .arg(
-            Arg::with_name("etymology")
-                .short("e")
+            Arg::new("etymology")
+                .short('e')
                 .long("etymology")
                 .help("Search for etymology instead of definition"),
         )
         .arg(
-            Arg::with_name("fetch-update")
-                .short("f")
+            Arg::new("fetch-update")
+                .short('f')
                 .long("fetch-update")
                 .help("Fetch new data; update cache if applicable"),
         )
         .arg(
-            Arg::with_name("INPUT")
+            Arg::new("INPUT")
                 .help("The word or phrase to look up")
-                .required_unless("clear-cache")
+                .required_unless_present("clear-cache")
                 .index(1),
         )
         .get_matches();
