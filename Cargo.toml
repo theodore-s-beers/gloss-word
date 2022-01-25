@@ -23,7 +23,7 @@ tempfile = "3.3.0"
 trash = "2.0.3"
 
 [dependencies.clap]
-version = "3.0.10"
+version = "3.0.12"
 features = ["cargo"]
 
 [dependencies.rusqlite]
