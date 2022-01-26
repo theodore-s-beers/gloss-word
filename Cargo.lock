@@ -1317,14 +1317,15 @@ dependencies = [
 
 [[package]]
 name = "trash"
-version = "2.0.3"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43d914d78ef2b3fa25b439047f39ae5476ff44e543f088054b096c780966b7e7"
+checksum = "9a2ed4369f59214865022230fb397ad71353101fe87bfef0f0cf887c43eaa094"
 dependencies = [
  "chrono",
  "libc",
  "log",
  "objc",
+ "once_cell",
  "scopeguard",
  "url",
  "windows",
