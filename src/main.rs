@@ -1,13 +1,16 @@
+use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 use std::{fs, str};
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use clap::{crate_version, App, Arg};
 use directories::ProjectDirs;
 use gloss_word::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use rusqlite::Connection;
 use scraper::{ElementRef, Selector};
+use tempfile::NamedTempFile;
 
 #[derive(Debug)]
 struct Entry {
@@ -238,6 +241,28 @@ fn main() -> Result<(), anyhow::Error> {
     // If still no dice...
     pb.finish_and_clear();
     Err(anyhow!("Definition not found"))
+}
+
+// Function to call Pandoc in case of suggested alternate words
+pub fn pandoc_fallback(results: String) -> Result<String, anyhow::Error> {
+    // Write results string into a tempfile to pass to Pandoc
+    let mut pandoc_input = NamedTempFile::new().context("Failed to create tempfile")?;
+    write!(pandoc_input, "{}", results).context("Failed to write to tempfile")?;
+
+    let pandoc = Command::new("pandoc")
+        .arg(pandoc_input.path())
+        .arg("-f")
+        .arg("html+smart-native_divs")
+        .arg("-t")
+        .arg("plain")
+        .output()
+        .context("Failed to execute Pandoc")?;
+
+    let pandoc_output = str::from_utf8(&pandoc.stdout)
+        .context("Failed to convert Pandoc output to string")?
+        .to_string();
+
+    Ok(pandoc_output)
 }
 
 // Function to query db for cached results
