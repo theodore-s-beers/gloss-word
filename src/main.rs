@@ -166,18 +166,19 @@ fn main() -> Result<(), anyhow::Error> {
         lookup_url += &desired_word.replace(' ', "+");
     }
 
-    // Make request and read response body into string
+    // Make HTTP request and read response body into string
     let response_text = get_response_text(lookup_url)?;
 
-    // Write new comment to explain this
+    // Take desired chunk of response text (in definition mode)
+    // In any case, parse what we have as an HTML tree
     let parsed_chunk = take_chunk(response_text);
 
-    // Write new comment to explain this
+    // Take specific selectors that we want
     let section_vec = get_section_vec(etym_mode, &parsed_chunk);
 
-    // Check to see if we got the section(s) we wanted
+    // Check to see if we got any sections
     if !section_vec.is_empty() {
-        // Write new comment to explain this
+        // Compile results into string
         let results = compile_results(etym_mode, section_vec);
 
         // Call out to Pandoc

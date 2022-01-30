@@ -8,7 +8,7 @@ use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
 use tempfile::NamedTempFile;
 
-// Write new comment to explain this
+// Take list of elements and compile them into a string (as appropriate)
 pub fn compile_results(etym_mode: bool, section_vec: Vec<ElementRef>) -> String {
     // Set up a string to hold results
     let mut results = String::new();
@@ -31,7 +31,7 @@ pub fn compile_results(etym_mode: bool, section_vec: Vec<ElementRef>) -> String 
     results
 }
 
-// Write new comment to explain this
+// Make HTTP request and read response body into string
 pub fn get_response_text(lookup_url: String) -> Result<String, anyhow::Error> {
     let response_text = isahc::get(lookup_url)
         .context("Failed to complete HTTP request")?
@@ -41,7 +41,7 @@ pub fn get_response_text(lookup_url: String) -> Result<String, anyhow::Error> {
     Ok(response_text)
 }
 
-// Write new comment to explain this
+// Cull certain elements from the HTML fragment, based on CSS selectors
 pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef> {
     // Set up a selector for the relevant section
     let section_selector = match etym_mode {
@@ -133,7 +133,7 @@ pub fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow
     Ok(final_output)
 }
 
-// Write new comment to explain this
+// Take only part of the response text, for faster parsing
 pub fn take_chunk(response_text: String) -> Html {
     // In definition mode, we split the document
     // Otherwise we could blow a bunch of time parsing the whole thing
