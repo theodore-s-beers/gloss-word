@@ -4,7 +4,7 @@ use std::process::Command;
 use std::{fs, str};
 
 use anyhow::{anyhow, Context};
-use clap::{crate_version, App, Arg};
+use clap::{crate_authors, crate_description, crate_name, crate_version, App, Arg};
 use directories::ProjectDirs;
 use gloss_word::*;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -23,10 +23,10 @@ fn main() -> Result<(), anyhow::Error> {
     // CLI SETUP
     //
 
-    let matches = App::new("gloss-word")
+    let matches = App::new(crate_name!())
         .version(crate_version!())
-        .author("Theo Beers <theo.beers@fu-berlin.de>")
-        .about("A simple English dictionary lookup utility")
+        .author(crate_authors!())
+        .about(crate_description!())
         .arg(
             Arg::new("clear-cache")
                 .long("clear-cache")
@@ -47,8 +47,7 @@ fn main() -> Result<(), anyhow::Error> {
         .arg(
             Arg::new("INPUT")
                 .help("The word or phrase to look up")
-                .required_unless_present("clear-cache")
-                .index(1),
+                .required_unless_present("clear-cache"),
         )
         .get_matches();
 
