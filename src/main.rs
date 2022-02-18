@@ -4,7 +4,7 @@ use std::process::Command;
 use std::{fs, str};
 
 use anyhow::{anyhow, Context};
-use clap::{crate_authors, crate_description, crate_name, crate_version, App, Arg};
+use clap::{crate_authors, crate_description, crate_name, crate_version, Arg};
 use directories::ProjectDirs;
 use gloss_word::*;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -23,7 +23,7 @@ fn main() -> Result<(), anyhow::Error> {
     // CLI SETUP
     //
 
-    let matches = App::new(crate_name!())
+    let matches = clap::Command::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
