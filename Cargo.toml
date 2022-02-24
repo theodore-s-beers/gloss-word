@@ -13,7 +13,7 @@ repository = "https://github.com/theodore-s-beers/gloss-word"
 exclude = ["og.png"]
 
 [dependencies]
-anyhow = "1.0.53"
+anyhow = "1.0.55"
 directories = "4.0.1"
 indicatif = "0.16.2"
 isahc = "1.6.0"
@@ -23,7 +23,7 @@ tempfile = "3.3.0"
 trash = "2.0.4"
 
 [dependencies.clap]
-version = "3.1.0"
+version = "3.1.2"
 features = ["cargo"]
 
 [dependencies.rusqlite]
