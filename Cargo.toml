@@ -27,7 +27,7 @@ version = "3.1.2"
 features = ["cargo"]
 
 [dependencies.rusqlite]
-version = "0.26.3"
+version = "0.27.0"
 features = ["bundled"]
 
 [[bin]]
