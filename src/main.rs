@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic, clippy::cargo)]
+
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -6,7 +8,7 @@ use std::{fs, str};
 use anyhow::{anyhow, Context};
 use clap::{crate_authors, crate_description, crate_name, crate_version, Arg};
 use directories::ProjectDirs;
-use gloss_word::*;
+use gloss_word::{compile_results, get_response_text, get_section_vec, pandoc_primary, take_chunk};
 use indicatif::{ProgressBar, ProgressStyle};
 use rusqlite::Connection;
 use scraper::{ElementRef, Selector};
@@ -18,6 +20,7 @@ struct Entry {
     content: String,
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() -> Result<(), anyhow::Error> {
     //
     // CLI SETUP
@@ -93,7 +96,7 @@ fn main() -> Result<(), anyhow::Error> {
 
         // If we don't have the cache dir yet, try to create it
         if !cache_dir.exists() {
-            let _ = fs::create_dir_all(cache_dir);
+            let _dir = fs::create_dir_all(cache_dir);
         }
 
         // Construct appropriate path for db
@@ -111,7 +114,7 @@ fn main() -> Result<(), anyhow::Error> {
         db_available = true;
 
         // Create both tables, if they don't exist
-        let _ = db_conn.execute(
+        let _create_dic = db_conn.execute(
             "CREATE TABLE IF NOT EXISTS dictionary (
                     word        TEXT UNIQUE NOT NULL,
                     content     TEXT NOT NULL
@@ -119,7 +122,7 @@ fn main() -> Result<(), anyhow::Error> {
             [],
         );
 
-        let _ = db_conn.execute(
+        let _create_etym = db_conn.execute(
             "CREATE TABLE IF NOT EXISTS etymology (
                     word        TEXT UNIQUE NOT NULL,
                     content     TEXT NOT NULL
@@ -128,9 +131,9 @@ fn main() -> Result<(), anyhow::Error> {
         );
 
         // If we got a cache hit, handle it (usually print and return)
-        if let Ok(entry) = query_db(db_conn, &desired_word, etym_mode) {
+        if let Ok(entry) = query_db(&db_conn, &desired_word, etym_mode) {
             if force_fetch {
-                cache_hit = true
+                cache_hit = true;
             } else {
                 print!("{}", entry);
                 return Ok(());
@@ -185,7 +188,7 @@ fn main() -> Result<(), anyhow::Error> {
 
         // Try to cache result; this can fail silently
         if db_available {
-            let _ = update_cache(
+            let _update = update_cache(
                 cache_hit,
                 db_path,
                 &desired_word,
@@ -223,12 +226,12 @@ fn main() -> Result<(), anyhow::Error> {
         // If so, collect results and push to string
         let mut results = String::new();
 
-        for element in suggestions_vec.iter() {
+        for element in &suggestions_vec {
             results.push_str(&element.html());
         }
 
         // Call out to Pandoc
-        let pandoc_output = pandoc_fallback(results)?;
+        let pandoc_output = pandoc_fallback(&results)?;
 
         // Print an explanatory message, then the results
         // Also clear the spinner
@@ -244,7 +247,7 @@ fn main() -> Result<(), anyhow::Error> {
 }
 
 // Function to call Pandoc in case of suggested alternate words
-pub fn pandoc_fallback(results: String) -> Result<String, anyhow::Error> {
+fn pandoc_fallback(results: &str) -> Result<String, anyhow::Error> {
     // Write results string into a tempfile to pass to Pandoc
     let mut pandoc_input = NamedTempFile::new().context("Failed to create tempfile")?;
     write!(pandoc_input, "{}", results).context("Failed to write to tempfile")?;
@@ -267,7 +270,7 @@ pub fn pandoc_fallback(results: String) -> Result<String, anyhow::Error> {
 
 // Function to query db for cached results
 fn query_db(
-    db_conn: Connection,
+    db_conn: &Connection,
     desired_word: &str,
     etym_mode: bool,
 ) -> Result<String, rusqlite::Error> {
