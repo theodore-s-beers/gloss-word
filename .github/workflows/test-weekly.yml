@@ -2,7 +2,7 @@ name: Test weekly
 
 on:
   schedule:
-    - cron: "0 4 * * 4"
+    - cron: "0 12 * * 4"
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install Pandoc
+        run: sudo apt install -y pandoc
       - name: Build
         run: cargo build --verbose
       - name: Run tests
