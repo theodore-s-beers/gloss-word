@@ -16,14 +16,15 @@ exclude = ["og.png"]
 anyhow = "1.0.57"
 directories = "4.0.1"
 indicatif = "0.16.2"
-isahc = "1.7.2"
 regex = "1.5.6"
 scraper = "0.13.0"
 tempfile = "3.3.0"
 trash = "2.1.4"
+reqwest = "0.11.11"
+tokio = { version = "1.19.2", features = ["full"] }
 
 [dependencies.clap]
-version = "3.1.18"
+version = "3.2.5"
 features = ["cargo"]
 
 [dependencies.rusqlite]

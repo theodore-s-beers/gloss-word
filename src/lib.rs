@@ -3,7 +3,6 @@ use std::process::Command;
 use std::str;
 
 use anyhow::Context;
-use isahc::prelude::*;
 use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
 use tempfile::NamedTempFile;
@@ -32,11 +31,13 @@ pub fn compile_results(etym_mode: bool, section_vec: Vec<ElementRef>) -> String 
 }
 
 // Make HTTP request and read response body into string
-pub fn get_response_text(lookup_url: String) -> Result<String, anyhow::Error> {
-    let response_text = isahc::get(lookup_url)
+pub async fn get_response_text(lookup_url: String) -> Result<String, anyhow::Error> {
+    let response_text = reqwest::get(lookup_url)
+        .await
         .context("Failed to complete HTTP request")?
         .text()
-        .context("Failed to read HTTP response body to string")?;
+        .await
+        .context("Failed to decode HTTP response body")?;
 
     Ok(response_text)
 }
@@ -149,8 +150,8 @@ pub fn take_chunk(response_text: String) -> Html {
 mod tests {
     use super::*;
 
-    fn full_sequence(etym_mode: bool, lookup_url: String) -> String {
-        let response_text = get_response_text(lookup_url).unwrap();
+    async fn full_sequence(etym_mode: bool, lookup_url: String) -> String {
+        let response_text = get_response_text(lookup_url).await.unwrap();
 
         let parsed_chunk = take_chunk(response_text);
 
@@ -163,48 +164,48 @@ mod tests {
         output
     }
 
-    #[test]
-    fn def_atavism() {
+    #[tokio::test]
+    async fn def_atavism() {
         let etym_mode = false;
         let lookup_url = String::from("https://www.thefreedictionary.com/atavism");
 
-        let output = full_sequence(etym_mode, lookup_url);
+        let output = full_sequence(etym_mode, lookup_url).await;
 
         let standard = String::from("at·a·vism\n\nn.\n\n1.  The reappearance of a characteristic in an organism after several\n    generations of absence.\n\n2.  An individual or a part that exhibits atavism. Also called\n    throwback.\n\n3.  The return of a trait or recurrence of previous behavior after a\n    period of absence.\n");
 
         assert_eq!(output, standard);
     }
 
-    #[test]
-    fn def_isthmus() {
+    #[tokio::test]
+    async fn def_isthmus() {
         let etym_mode = false;
         let lookup_url = String::from("https://www.thefreedictionary.com/isthmus");
 
-        let output = full_sequence(etym_mode, lookup_url);
+        let output = full_sequence(etym_mode, lookup_url).await;
 
         let standard = String::from("isth·mus\n\nn. pl. isth·mus·es or isth·mi (-mī′)\n\n1.  A narrow strip of land connecting two larger masses of land.\n\n2.  Anatomy\n\n    a.  A narrow strip of tissue joining two larger organs or parts of\n        an organ.\n\n    b.  A narrow passage connecting two larger cavities.\n");
 
         assert_eq!(output, standard);
     }
 
-    #[test]
-    fn etym_cummerbund() {
+    #[tokio::test]
+    async fn etym_cummerbund() {
         let etym_mode = true;
         let lookup_url = String::from("https://www.etymonline.com/word/cummerbund");
 
-        let output = full_sequence(etym_mode, lookup_url);
+        let output = full_sequence(etym_mode, lookup_url).await;
 
         let standard = String::from("cummerbund (n.)\n\n“large, loose sash worn as a belt,” 1610s, from Hindi kamarband “loin\nband,” from Persian kamar “waist” + band “something that ties,” from\nAvestan banda- “bond, fetter,” from PIE root *bhendh- “to bind.”\n");
 
         assert_eq!(output, standard);
     }
 
-    #[test]
-    fn etym_forest() {
+    #[tokio::test]
+    async fn etym_forest() {
         let etym_mode = true;
         let lookup_url = String::from("https://www.etymonline.com/word/forest");
 
-        let output = full_sequence(etym_mode, lookup_url);
+        let output = full_sequence(etym_mode, lookup_url).await;
 
         let standard = String::from("forest (n.)\n\nlate 13c., “extensive tree-covered district,” especially one set aside\nfor royal hunting and under the protection of the king, from Old French\nforest “forest, wood, woodland” (Modern French forêt), probably\nultimately from Late Latin/Medieval Latin forestem silvam “the outside\nwoods,” a term from the Capitularies of Charlemagne denoting “the royal\nforest.” This word comes to Medieval Latin, perhaps via a Germanic\nsource akin to Old High German forst, from Latin foris “outside” (see\nforeign). If so, the sense is “beyond the park,” the park (Latin parcus;\nsee park (n.)) being the main or central fenced woodland.\n\nAnother theory traces it through Medieval Latin forestis, originally\n“forest preserve, game preserve,” from Latin forum in legal sense\n“court, judgment;” in other words “land subject to a ban” [Buck].\nReplaced Old English wudu (see wood (n.)). Spanish and Portuguese\nfloresta have been influenced by flor “flower.”\n\nforest (v.)\n\n“cover with trees or woods,” 1818 (forested is attested from 1610s),\nfrom forest (n.). The earlier word was afforest (c.\u{a0}1500).\n");
 

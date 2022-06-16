@@ -21,7 +21,9 @@ struct Entry {
 }
 
 #[allow(clippy::too_many_lines)]
-fn main() -> Result<(), anyhow::Error> {
+#[tokio::main]
+
+async fn main() -> Result<(), anyhow::Error> {
     //
     // CLI SETUP
     //
@@ -169,7 +171,7 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     // Make HTTP request and read response body into string
-    let response_text = get_response_text(lookup_url)?;
+    let response_text = get_response_text(lookup_url).await?;
 
     // Take desired chunk of response text (in definition mode)
     // In any case, parse what we have as an HTML tree
