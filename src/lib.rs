@@ -79,9 +79,6 @@ pub fn pandoc_plain(input: String) -> Result<String, anyhow::Error> {
 
 // Main Pandoc function
 pub fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Error> {
-    #[allow(clippy::needless_late_init)]
-    let final_output: String;
-
     // Write results string into a tempfile to pass to Pandoc
     let mut input_file_1 = NamedTempFile::new().context("Failed to create tempfile")?;
     write!(input_file_1, "{}", results).context("Failed to write to tempfile")?;
@@ -110,8 +107,9 @@ pub fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow
         // Don't know why Pandoc is outputting these, anyway
         let after_2 = after_1.replace(r#"\\""#, r#"""#);
 
-        // Get final output
-        final_output = pandoc_plain(after_2)?;
+        // Return final output
+        let final_output = pandoc_plain(after_2)?;
+        Ok(final_output)
     } else {
         // Un-bold numbered list labels
         let re_list_1 = Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap();
@@ -125,11 +123,10 @@ pub fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow
         // Don't know why Pandoc is outputting these, anyway
         let after_3 = after_2.replace(r#"\\""#, r#"""#);
 
-        // Get final output
-        final_output = pandoc_plain(after_3)?;
+        // Return final output
+        let final_output = pandoc_plain(after_3)?;
+        Ok(final_output)
     }
-
-    Ok(final_output)
 }
 
 // Take only part of the response text, for faster parsing
