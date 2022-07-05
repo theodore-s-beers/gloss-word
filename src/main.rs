@@ -14,12 +14,6 @@ use rusqlite::Connection;
 use scraper::{ElementRef, Selector};
 use tempfile::NamedTempFile;
 
-#[derive(Debug)]
-struct Entry {
-    _word: String,
-    content: String,
-}
-
 #[allow(clippy::too_many_lines)]
 fn main() -> Result<(), anyhow::Error> {
     //
@@ -288,15 +282,10 @@ fn query_db(
 
     let mut stmt = db_conn.prepare(&query)?;
 
-    // We're only looking for one row
-    let entry = stmt.query_row([], |row| {
-        Ok(Entry {
-            _word: row.get(0)?,
-            content: row.get(1)?,
-        })
-    })?;
+    // We're looking for only one row, and only its definition/etymology column
+    let entry_content: String = stmt.query_row([], |row| row.get(1))?;
 
-    Ok(entry.content)
+    Ok(entry_content)
 }
 
 // Function to try to update cache with new results
