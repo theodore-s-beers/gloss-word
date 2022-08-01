@@ -143,11 +143,12 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Start a progress spinner; this could take a second
     let pb = ProgressBar::new_spinner();
-    pb.enable_steady_tick(80);
+    pb.enable_steady_tick(std::time::Duration::from_millis(80));
     pb.set_style(
         ProgressStyle::default_spinner()
             .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
-            .template("{spinner} {msg}"),
+            .template("{spinner} {msg}")
+            .unwrap(),
     );
     pb.set_message("Fetching...");
 
