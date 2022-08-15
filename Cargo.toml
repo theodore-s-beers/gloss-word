@@ -14,7 +14,7 @@ exclude = ["og.png"]
 
 [dependencies]
 anyhow = "1.0.60"
-clap = { version = "3.2.16", features = ["cargo"] }
+clap = { version = "3.2.17", features = ["cargo"] }
 directories = "4.0.1"
 indicatif = "0.17.0"
 regex = "1.6.0"
