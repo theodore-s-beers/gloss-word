@@ -6,7 +6,7 @@ use std::process::Command;
 use std::{fs, str};
 
 use anyhow::{anyhow, Context};
-use clap::{crate_authors, crate_description, crate_name, crate_version, Arg};
+use clap::{crate_authors, crate_description, crate_name, crate_version, Arg, ArgAction};
 use directories::ProjectDirs;
 use gloss_word::{compile_results, get_response_text, get_section_vec, pandoc_primary, take_chunk};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -27,19 +27,22 @@ fn main() -> Result<(), anyhow::Error> {
         .arg(
             Arg::new("clear-cache")
                 .long("clear-cache")
-                .help("Delete cache directory and its contents"),
+                .help("Delete cache directory and its contents")
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("etymology")
                 .short('e')
                 .long("etymology")
-                .help("Search for etymology instead of definition"),
+                .help("Search for etymology instead of definition")
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("fetch-update")
                 .short('f')
                 .long("fetch-update")
-                .help("Fetch new data; update cache if applicable"),
+                .help("Fetch new data; update cache if applicable")
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("INPUT")
@@ -53,15 +56,17 @@ fn main() -> Result<(), anyhow::Error> {
     //
 
     // Do we have flags?
-    let clear_cache = matches.is_present("clear-cache");
-    let etym_mode = matches.is_present("etymology");
-    let force_fetch = matches.is_present("fetch-update");
+    let clear_cache = matches.get_flag("clear-cache");
+    let etym_mode = matches.get_flag("etymology");
+    let force_fetch = matches.get_flag("fetch-update");
 
     // Take input and lowercase it
     // Is this ok to unwrap?
     let mut desired_word = String::new();
     if !clear_cache {
-        desired_word = matches.value_of("INPUT").unwrap().to_lowercase();
+        // I had trouble with type inference with the `get_one` method; hence this indirection
+        let input_word: &String = matches.get_one("INPUT").unwrap();
+        desired_word = input_word.clone().to_lowercase();
     }
 
     // What should be the path to the cache db? Is the db accessible?
