@@ -59,12 +59,12 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Take input and lowercase it
     // Is this ok to unwrap?
-    let mut desired_word = String::new();
-    if !clear_cache {
-        // I had trouble with type inference with the `get_one` method; hence this indirection
+    let desired_word = if clear_cache {
+        String::new()
+    } else {
         let input_word: &String = matches.get_one("INPUT").unwrap();
-        desired_word = input_word.clone().to_lowercase();
-    }
+        input_word.clone().to_lowercase()
+    };
 
     // What should be the path to the cache db? Is the db accessible?
     let mut db_path = PathBuf::new();
