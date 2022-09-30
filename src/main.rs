@@ -6,7 +6,7 @@ use std::process::Command;
 use std::{fs, str};
 
 use anyhow::{anyhow, Context};
-use clap::{crate_authors, crate_description, crate_name, crate_version, Arg, ArgAction};
+use clap::{command, Arg, ArgAction};
 use directories::ProjectDirs;
 use gloss_word::{compile_results, get_response_text, get_section_vec, pandoc_primary, take_chunk};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -20,10 +20,7 @@ fn main() -> Result<(), anyhow::Error> {
     // CLI SETUP
     //
 
-    let matches = clap::Command::new(crate_name!())
-        .version(crate_version!())
-        .author(crate_authors!())
-        .about(crate_description!())
+    let matches = command!()
         .arg(
             Arg::new("clear-cache")
                 .long("clear-cache")
