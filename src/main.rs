@@ -131,7 +131,7 @@ fn main() -> Result<(), anyhow::Error> {
             if force_fetch {
                 cache_hit = true;
             } else {
-                print!("{}", entry);
+                print!("{entry}");
                 return Ok(());
             }
         }
@@ -198,7 +198,7 @@ fn main() -> Result<(), anyhow::Error> {
         // We still need to print results, of course
         // Also clear the spinner
         pb.finish_and_clear();
-        print!("{}", final_output);
+        print!("{final_output}");
         return Ok(());
     }
 
@@ -234,7 +234,7 @@ fn main() -> Result<(), anyhow::Error> {
         // Also clear the spinner
         pb.finish_and_clear();
         println!("Did you mean:\n");
-        print!("{}", pandoc_output);
+        print!("{pandoc_output}");
         return Ok(());
     }
 
@@ -247,7 +247,7 @@ fn main() -> Result<(), anyhow::Error> {
 fn pandoc_fallback(results: &str) -> Result<String, anyhow::Error> {
     // Write results string into a tempfile to pass to Pandoc
     let mut pandoc_input = NamedTempFile::new().context("Failed to create tempfile")?;
-    write!(pandoc_input, "{}", results).context("Failed to write to tempfile")?;
+    write!(pandoc_input, "{results}").context("Failed to write to tempfile")?;
 
     let pandoc = Command::new("pandoc")
         .arg(pandoc_input.path())

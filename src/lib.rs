@@ -154,9 +154,7 @@ mod tests {
 
         let results = compile_results(etym_mode, section_vec);
 
-        let output = pandoc_primary(etym_mode, results).unwrap();
-
-        output
+        pandoc_primary(etym_mode, results).unwrap()
     }
 
     #[test]
