@@ -61,7 +61,7 @@ pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef> 
 pub fn pandoc_plain(input: String) -> Result<String, anyhow::Error> {
     // String is again written to a tempfile for Pandoc
     let mut input_file = NamedTempFile::new().context("Failed to create tempfile")?;
-    write!(input_file, "{}", input).context("Failed to write to tempfile")?;
+    write!(input_file, "{input}").context("Failed to write to tempfile")?;
 
     let pandoc = Command::new("pandoc")
         .arg(input_file.path())
@@ -81,7 +81,7 @@ pub fn pandoc_plain(input: String) -> Result<String, anyhow::Error> {
 pub fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow::Error> {
     // Write results string into a tempfile to pass to Pandoc
     let mut input_file_1 = NamedTempFile::new().context("Failed to create tempfile")?;
-    write!(input_file_1, "{}", results).context("Failed to write to tempfile")?;
+    write!(input_file_1, "{results}").context("Failed to write to tempfile")?;
 
     let pandoc_1 = Command::new("pandoc")
         .arg(input_file_1.path())
