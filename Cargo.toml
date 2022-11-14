@@ -16,7 +16,7 @@ exclude = ["og.png"]
 anyhow = "1.0.66"
 clap = { version = "4.0.18", features = ["cargo"] }
 directories = "4.0.1"
-indicatif = "0.17.1"
+indicatif = "0.17.2"
 regex = "1.6.0"
 reqwest = { version = "0.11.12", features = ["blocking"] }
 rusqlite = { version = "0.28.0", features = ["bundled"] }
