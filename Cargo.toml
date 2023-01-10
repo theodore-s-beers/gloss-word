@@ -17,7 +17,7 @@ anyhow = "1.0.68"
 clap = { version = "4.0.32", features = ["cargo"] }
 directories = "4.0.1"
 indicatif = "0.17.2"
-regex = "1.7.0"
+regex = "1.7.1"
 reqwest = { version = "0.11.13", features = ["blocking"] }
 rusqlite = { version = "0.28.0", features = ["bundled"] }
 scraper = "0.14.0"
