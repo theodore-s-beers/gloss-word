@@ -49,7 +49,7 @@ fn main() -> Result<(), anyhow::Error> {
         .get_matches();
 
     //
-    // GLOBAL VARIABLES
+    // "GLOBAL" VARIABLES
     //
 
     // Do we have flags?
@@ -58,15 +58,14 @@ fn main() -> Result<(), anyhow::Error> {
     let force_fetch = matches.get_flag("fetch-update");
 
     // Take input and lowercase it
-    // Is this ok to unwrap?
     let desired_word = if clear_cache {
-        String::new()
+        String::new() // Placeholder; we'll return soon, anyway
     } else {
-        let input_word: &String = matches.get_one("INPUT").unwrap();
+        let input_word: &String = matches.get_one("INPUT").unwrap(); // Should be ok
         input_word.clone().to_lowercase()
     };
 
-    // What should be the path to the cache db? Is the db accessible?
+    // What will be the path to the cache db? Is the db accessible?
     let mut db_path = PathBuf::new();
     let mut db_available = false;
 
@@ -110,6 +109,7 @@ fn main() -> Result<(), anyhow::Error> {
         db_available = true;
 
         // Create both tables, if they don't exist
+
         let _create_dic = db_conn.execute(
             "CREATE TABLE IF NOT EXISTS dictionary (
                     word        TEXT UNIQUE NOT NULL,
@@ -175,7 +175,7 @@ fn main() -> Result<(), anyhow::Error> {
     // Take specific selectors that we want
     let section_vec = get_section_vec(etym_mode, &parsed_chunk);
 
-    // Check to see if we got any sections
+    // If we got one or more sections...
     if !section_vec.is_empty() {
         // Compile results into string
         let results = compile_results(etym_mode, section_vec);
@@ -195,14 +195,11 @@ fn main() -> Result<(), anyhow::Error> {
             );
         }
 
-        // We still need to print results, of course
-        // Also clear the spinner
+        // We still need to print results, of course (after clearing the spinner)
         pb.finish_and_clear();
         print!("{final_output}");
         return Ok(());
     }
-
-    // Moving on...
 
     //
     // FALLBACK
@@ -218,9 +215,8 @@ fn main() -> Result<(), anyhow::Error> {
     let suggestions_selector = Selector::parse("ul.suggestions li").unwrap();
     let suggestions_vec: Vec<ElementRef> = parsed_chunk.select(&suggestions_selector).collect();
 
-    // Again, see if we got anything
+    // If we got something...
     if !suggestions_vec.is_empty() {
-        // If so, collect results and push to string
         let mut results = String::new();
 
         for element in &suggestions_vec {
@@ -230,8 +226,7 @@ fn main() -> Result<(), anyhow::Error> {
         // Call out to Pandoc
         let pandoc_output = pandoc_fallback(&results)?;
 
-        // Print an explanatory message, then the results
-        // Also clear the spinner
+        // Print an explanatory message, then the results (after clearing the spinner)
         pb.finish_and_clear();
         println!("Did you mean:\n");
         print!("{pandoc_output}");

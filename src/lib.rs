@@ -9,7 +9,6 @@ use tempfile::NamedTempFile;
 
 // Take list of elements and compile them into a string (as appropriate)
 pub fn compile_results(etym_mode: bool, section_vec: Vec<ElementRef>) -> String {
-    // Set up a string to hold results
     let mut results = String::new();
 
     if etym_mode {
@@ -99,15 +98,14 @@ pub fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow
 
     // Make regex (and simple text) replacements, depending on search mode
     if etym_mode {
-        // This is to remove any figures
+        // Remove any figures
         let re_figures = Regex::new(r"(?m)\n\n!\[.+$").unwrap();
         let after_1 = re_figures.replace_all(output_1, "");
 
-        // This just un-escapes double quotes
-        // Don't know why Pandoc is outputting these, anyway
+        // Un-escape double quotes
+        // I don't know why Pandoc is outputting these to begin with
         let after_2 = after_1.replace(r#"\\""#, r#"""#);
 
-        // Return final output
         let final_output = pandoc_plain(after_2)?;
         Ok(final_output)
     } else {
@@ -119,11 +117,9 @@ pub fn pandoc_primary(etym_mode: bool, results: String) -> Result<String, anyhow
         let re_list_2 = Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
         let after_2 = re_list_2.replace_all(&after_1, "\n    $b");
 
-        // This just un-escapes double quotes
-        // Don't know why Pandoc is outputting these, anyway
+        // Un-escape double quotes
         let after_3 = after_2.replace(r#"\\""#, r#"""#);
 
-        // Return final output
         let final_output = pandoc_plain(after_3)?;
         Ok(final_output)
     }
