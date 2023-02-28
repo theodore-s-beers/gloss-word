@@ -14,14 +14,14 @@ exclude = ["og.png"]
 
 [dependencies]
 anyhow = "1.0.69"
-clap = { version = "4.1.6", features = ["cargo"] }
+clap = { version = "4.1.8", features = ["cargo"] }
 directories = "4.0.1"
 indicatif = "0.17.3"
 regex = "1.7.1"
 reqwest = { version = "0.11.14", features = ["blocking"] }
 rusqlite = { version = "0.28.0", features = ["bundled"] }
-scraper = "0.14.0"
-tempfile = "3.3.0"
+scraper = "0.15.0"
+tempfile = "3.4.0"
 
 [dependencies.trash]
 version = "3.0.1"
