@@ -13,9 +13,9 @@ repository = "https://github.com/theodore-s-beers/gloss-word"
 exclude = ["og.png"]
 
 [dependencies]
-anyhow = "1.0.69"
-clap = { version = "4.1.8", features = ["cargo"] }
-directories = "4.0.1"
+anyhow = "1.0.70"
+clap = { version = "4.1.11", features = ["cargo"] }
+directories = "5.0.0"
 indicatif = "0.17.3"
 regex = "1.7.1"
 reqwest = { version = "0.11.14", features = ["blocking"] }
