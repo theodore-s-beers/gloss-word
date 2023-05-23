@@ -43,7 +43,7 @@ pub fn get_response_text(lookup_url: String) -> Result<String, anyhow::Error> {
 pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef> {
     // Set up a selector for the relevant section
     let section_selector = match etym_mode {
-        true => Selector::parse(r#"div[class^="word--"]:not([class*="word_4pc"])"#).unwrap(),
+        true => Selector::parse(r#"div[class^="word--"]:not([class*="word_4pc"]) h1, div[class^="word--"]:not([class*="word_4pc"]) p"#).unwrap(),
         _ => Selector::parse(r#"div#Definition section[data-src="hm"]"#).unwrap(),
     };
 
