@@ -9,7 +9,7 @@ pulled from the [Online Etymology Dictionary](https://www.etymonline.com/).
 
 While the package is called `gloss-word`—since I needed a unique name to publish
 it to [crates.io](https://crates.io/)—the binary itself, and hence the command,
-is `gloss`. I like to use a shell function to pipe the output to
+is `gloss`. I also like to use a shell function to pipe the output to
 [bat](https://github.com/sharkdp/bat) for pretty-printing. That's pasted below.
 
 In short, the program makes a request (if necessary) to the appropriate website;
