@@ -62,7 +62,7 @@ fn main() -> Result<(), anyhow::Error> {
         String::new() // Placeholder; we'll return soon, anyway
     } else {
         let input_word: &String = matches.get_one("INPUT").unwrap(); // Should be ok
-        input_word.clone().to_lowercase()
+        input_word.to_lowercase()
     };
 
     // What will be the path to the cache db? Is the db accessible?
@@ -166,11 +166,11 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     // Make HTTP request and read response body into string
-    let response_text = get_response_text(lookup_url)?;
+    let response_text = get_response_text(&lookup_url)?;
 
     // Take desired chunk of response text (in definition mode)
     // In any case, parse what we have as an HTML tree
-    let parsed_chunk = take_chunk(response_text);
+    let parsed_chunk = take_chunk(&response_text);
 
     // Take specific selectors that we want
     let section_vec = get_section_vec(etym_mode, &parsed_chunk);
@@ -181,7 +181,7 @@ fn main() -> Result<(), anyhow::Error> {
         let results = compile_results(etym_mode, section_vec);
 
         // Call out to Pandoc
-        let final_output = pandoc_primary(etym_mode, results)?;
+        let final_output = pandoc_primary(etym_mode, &results)?;
 
         // Try to cache result; this can fail silently
         if db_available {
