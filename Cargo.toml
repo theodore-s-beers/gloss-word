@@ -18,8 +18,8 @@ clap = { version = "4.3.19", features = ["cargo"] }
 directories = "5.0.1"
 indicatif = "0.17.5"
 regex = "1.9.1"
-rusqlite = { version = "0.29.0", features = ["bundled"] }
-scraper = "0.17.1"
+rusqlite = { version = "0.30", features = ["bundled"] }
+scraper = "0.18"
 tempfile = "3.7.0"
 ureq = "2.7.1"
 
