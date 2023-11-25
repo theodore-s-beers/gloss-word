@@ -20,9 +20,10 @@ Results are cached in a rudimentary manner, so that repeat searches—however
 unlikely they may be—will not require fetching from TFD or Etymonline.
 
 **Pandoc is a required external dependency.** Everything else is handled by the
-Rust binary. I should note, however, that I wrote this program for my own use on
-macOS, and I've tested it only lightly on Windows (seems fine), and not at all
-on Linux. It's possible that some adjustments would be necessary.
+Rust binary. I should note, however, that I wrote this program initially for my
+own use on macOS, and I've tested it only lightly on Windows (seems fine), and
+not at all on Linux (though feedback from other users suggests no problems). Bug
+reports relating to OS compatibility would be welcome.
 
 Cached results are in the form of a basic SQLite database, in what is supposed
 to be a platform-appropriate location (relying on the
