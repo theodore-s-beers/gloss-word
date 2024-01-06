@@ -20,34 +20,33 @@ fn main() -> Result<(), anyhow::Error> {
     // CLI SETUP
     //
 
-    let matches =
-        command!()
-            .arg(
-                Arg::new("clear-cache")
-                    .long("clear-cache")
-                    .help("Delete cache directory and its contents")
-                    .action(ArgAction::SetTrue),
-            )
-            .arg(
-                Arg::new("etymology")
-                    .short('e')
-                    .long("etymology")
-                    .help("Search for etymology instead of definition")
-                    .action(ArgAction::SetTrue),
-            )
-            .arg(
-                Arg::new("fetch-update")
-                    .short('f')
-                    .long("fetch-update")
-                    .help("Fetch new data; update cache if applicable")
-                    .action(ArgAction::SetTrue),
-            )
-            .arg(
-                Arg::new("INPUT")
-                    .help("The word or phrase to look up")
-                    .required_unless_present("clear-cache"),
-            )
-            .get_matches();
+    let matches = command!()
+        .arg(
+            Arg::new("clear-cache")
+                .long("clear-cache")
+                .help("Delete cache directory and its contents")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("etymology")
+                .short('e')
+                .long("etymology")
+                .help("Search for etymology instead of definition")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("fetch-update")
+                .short('f')
+                .long("fetch-update")
+                .help("Fetch new data; update cache if applicable")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("INPUT")
+                .help("The word or phrase to look up")
+                .required_unless_present("clear-cache"),
+        )
+        .get_matches();
 
     //
     // "GLOBAL" VARIABLES
