@@ -31,10 +31,9 @@ pub fn compile_results(etym_mode: bool, section_vec: Vec<ElementRef>) -> String 
 
 // Make HTTP request and read response body into string
 pub fn get_response_text(lookup_url: &str) -> Result<String, anyhow::Error> {
-    let response_text = ureq::get(lookup_url)
-        .call()
+    let response_text = reqwest::blocking::get(lookup_url)
         .context("Failed to complete HTTP request")?
-        .into_string()
+        .text()
         .context("Failed to decode HTTP response body")?;
 
     Ok(response_text)
