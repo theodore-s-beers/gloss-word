@@ -13,11 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Pandoc
-        run:
-          wget
-          https://github.com/jgm/pandoc/releases/download/2.18/pandoc-2.18-1-amd64.deb
+        run: wget
+          https://github.com/jgm/pandoc/releases/download/3.1.11.1/pandoc-3.1.11.1-1-amd64.deb
       - name: Install Pandoc
-        run: sudo dpkg -i pandoc-2.18-1-amd64.deb
+        run: sudo dpkg -i pandoc-3.1.11.1-1-amd64.deb
       - uses: actions/checkout@v3
       - name: Build
         run: cargo build --verbose
