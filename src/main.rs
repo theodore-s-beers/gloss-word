@@ -83,13 +83,13 @@ fn main() -> Result<(), anyhow::Error> {
 
         // If we have clear-cache flag, handle it and return
         if clear_cache {
-            if cache_dir.exists() {
-                trash::delete(cache_dir)?;
-                eprintln!("Cache directory deleted");
-                return Ok(());
+            if !cache_dir.exists() {
+                return Err(anyhow!("Cache directory not found"));
             }
 
-            return Err(anyhow!("Cache directory not found"));
+            trash::delete(cache_dir)?;
+            eprintln!("Cache directory deleted");
+            return Ok(());
         }
 
         // If we don't have the cache dir yet, try to create it
