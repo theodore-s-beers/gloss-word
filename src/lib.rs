@@ -1,19 +1,23 @@
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+
 use std::io::Write;
 use std::process::Command;
-use std::str;
+use std::str; // For str::from_utf8
 
 use anyhow::Context;
 use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
 use tempfile::NamedTempFile;
 
+#[must_use]
 // Take list of elements and compile them into a string (as appropriate)
 pub fn compile_results(etym_mode: bool, section_vec: Vec<ElementRef>) -> String {
     let mut results = String::new();
 
     if etym_mode {
         // If etymology, just push everything from any sections
-        for section in section_vec.iter() {
+        for section in section_vec {
             results.push_str(&section.html());
         }
     } else {
@@ -39,12 +43,14 @@ pub fn get_response_text(lookup_url: &str) -> Result<String, anyhow::Error> {
     Ok(response_text)
 }
 
+#[must_use]
 // Cull certain elements from the HTML fragment, based on CSS selectors
 pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef> {
     // Set up a selector for the relevant section
-    let section_selector = match etym_mode {
-        true => Selector::parse(r#"div[class^="word--"]:not([class*="word_4pc"]) h1, div[class^="word--"]:not([class*="word_4pc"]) p"#).unwrap(),
-        _ => Selector::parse(r#"div#Definition section[data-src="hm"]"#).unwrap(),
+    let section_selector = if etym_mode {
+        Selector::parse(r#"div[class^="word--"]:not([class*="word_4pc"]) h1, div[class^="word--"]:not([class*="word_4pc"]) p"#).unwrap()
+    } else {
+        Selector::parse(r#"div#Definition section[data-src="hm"]"#).unwrap()
     };
 
     // Run the select iterator and collect the result(s) in a vec
@@ -125,6 +131,7 @@ pub fn pandoc_primary(etym_mode: bool, results: &str) -> Result<String, anyhow::
     }
 }
 
+#[must_use]
 // Take only part of the response text, for faster parsing
 pub fn take_chunk(response_text: &str) -> Html {
     // In definition mode, we split the document

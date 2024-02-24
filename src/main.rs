@@ -1,5 +1,6 @@
-#![warn(clippy::pedantic, clippy::cargo)]
+#![warn(clippy::pedantic, clippy::nursery, clippy::cargo)]
 
+use core::time::Duration;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -81,11 +82,13 @@ fn main() -> Result<(), anyhow::Error> {
         let cache_dir = proj_dirs.cache_dir();
 
         // If we have clear-cache flag, handle it and return
-        if clear_cache && cache_dir.exists() {
-            trash::delete(cache_dir)?;
-            eprintln!("Cache directory deleted");
-            return Ok(());
-        } else if clear_cache {
+        if clear_cache {
+            if cache_dir.exists() {
+                trash::delete(cache_dir)?;
+                eprintln!("Cache directory deleted");
+                return Ok(());
+            }
+
             return Err(anyhow!("Cache directory not found"));
         }
 
@@ -145,7 +148,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Start a progress spinner; this could take a second
     let pb = ProgressBar::new_spinner();
-    pb.enable_steady_tick(std::time::Duration::from_millis(80));
+    pb.enable_steady_tick(Duration::from_millis(80));
     pb.set_style(
         ProgressStyle::default_spinner()
             .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
@@ -158,10 +161,10 @@ fn main() -> Result<(), anyhow::Error> {
     let mut lookup_url: String;
 
     if etym_mode {
-        lookup_url = "https://www.etymonline.com/word/".to_string();
+        lookup_url = "https://www.etymonline.com/word/".to_owned();
         lookup_url += &desired_word.replace(' ', "%20");
     } else {
-        lookup_url = "https://www.thefreedictionary.com/".to_string();
+        lookup_url = "https://www.thefreedictionary.com/".to_owned();
         lookup_url += &desired_word.replace(' ', "+");
     }
 
@@ -255,7 +258,7 @@ fn pandoc_fallback(results: &str) -> Result<String, anyhow::Error> {
 
     let pandoc_output = str::from_utf8(&pandoc.stdout)
         .context("Failed to convert Pandoc output to string")?
-        .to_string();
+        .to_owned();
 
     Ok(pandoc_output)
 }
