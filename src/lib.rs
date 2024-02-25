@@ -77,7 +77,7 @@ pub fn pandoc_plain(input: &str) -> Result<String, anyhow::Error> {
 
     let output = str::from_utf8(&pandoc.stdout)
         .context("Failed to convert Pandoc output to string")?
-        .to_string();
+        .to_owned();
 
     Ok(output)
 }
