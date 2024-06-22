@@ -13,20 +13,16 @@ repository = "https://github.com/theodore-s-beers/gloss-word"
 exclude = ["og.png"]
 
 [dependencies]
-anyhow = "1.0.82"
-clap = { version = "4.5.4", features = ["cargo"] }
+anyhow = "1.0.86"
+clap = { version = "4.5.7", features = ["cargo"] }
 directories = "5.0.1"
 indicatif = "0.17.8"
-regex = "1.10.4"
-reqwest = { version = "0.12.4", features = ["blocking"] }
+regex = "1.10.5"
+reqwest = { version = "0.12.5", features = ["blocking"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 scraper = "0.19"
 tempfile = "3.10.1"
-
-[dependencies.trash]
-version = "4.1.0"
-default-features = false
-features = ["coinit_apartmentthreaded"]
+trash = "5.0.0"
 
 [[bin]]
 name = "gloss"
