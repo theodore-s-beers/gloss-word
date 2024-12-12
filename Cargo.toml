@@ -1,8 +1,8 @@
 [package]
 name = "gloss-word"
 version = "0.2.8"
-authors = ["Theo Beers <theo.beers@fu-berlin.de>"]
-edition = "2021"
+authors = ["Theo Beers <theo.beers@drexel.edu>"]
+edition = "2024"
 categories = ["command-line-utilities"]
 description = "A simple English dictionary lookup utility"
 homepage = "https://github.com/theodore-s-beers/gloss-word"
