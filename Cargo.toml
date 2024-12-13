@@ -1,6 +1,6 @@
 [package]
 name = "gloss-word"
-version = "0.2.8"
+version = "0.3.0"
 authors = ["Theo Beers <theo.beers@drexel.edu>"]
 edition = "2024"
 categories = ["command-line-utilities"]
