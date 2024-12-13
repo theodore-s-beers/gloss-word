@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::{fs, str};
 
-use anyhow::{Context, anyhow};
-use clap::{Arg, ArgAction, command};
+use anyhow::{anyhow, Context};
+use clap::{command, Arg, ArgAction};
 use directories::ProjectDirs;
 use gloss_word::{compile_results, get_response_text, get_section_vec, pandoc_primary, take_chunk};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -304,27 +304,27 @@ fn update_cache(
     // If we have force-fetch flag and got a cache hit, update
     if force_fetch && cache_hit {
         if etym_mode {
-            db_conn.execute("UPDATE etymology SET content = (?1) WHERE word = (?2)", [
-                final_output,
-                desired_word,
-            ])?;
+            db_conn.execute(
+                "UPDATE etymology SET content = (?1) WHERE word = (?2)",
+                [final_output, desired_word],
+            )?;
         } else {
-            db_conn.execute("UPDATE dictionary SET content = (?1) WHERE word = (?2)", [
-                final_output,
-                desired_word,
-            ])?;
+            db_conn.execute(
+                "UPDATE dictionary SET content = (?1) WHERE word = (?2)",
+                [final_output, desired_word],
+            )?;
         }
     // Else insert
     } else if etym_mode {
-        db_conn.execute("INSERT INTO etymology (word, content) VALUES (?1, ?2)", [
-            desired_word,
-            final_output,
-        ])?;
+        db_conn.execute(
+            "INSERT INTO etymology (word, content) VALUES (?1, ?2)",
+            [desired_word, final_output],
+        )?;
     } else {
-        db_conn.execute("INSERT INTO dictionary (word, content) VALUES (?1, ?2)", [
-            desired_word,
-            final_output,
-        ])?;
+        db_conn.execute(
+            "INSERT INTO dictionary (word, content) VALUES (?1, ?2)",
+            [desired_word, final_output],
+        )?;
     }
 
     Ok(())
