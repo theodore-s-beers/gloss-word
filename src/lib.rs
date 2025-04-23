@@ -48,7 +48,7 @@ pub fn get_response_text(lookup_url: &str) -> Result<String, anyhow::Error> {
 pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef> {
     // Set up a selector for the relevant section
     let section_selector = if etym_mode {
-        Selector::parse(r#"div[class^="word--"]:not([class*="word_4pc"]) h1, div[class^="word--"]:not([class*="word_4pc"]) p"#).unwrap()
+        Selector::parse(r##"h2[id^="#etymonline"] span, section.-mt-4"##).unwrap()
     } else {
         Selector::parse(r#"div#Definition section[data-src="hm"]"#).unwrap()
     };
@@ -63,7 +63,7 @@ pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef> 
 
 // Function to convert to plain text with Pandoc, as a final step
 // This used to be duplicated in pandoc_primary, but jscpd was complaining
-pub fn pandoc_plain(input: &str) -> Result<String, anyhow::Error> {
+pub fn pandoc_plain(input: &str, etym_mode: bool) -> Result<String, anyhow::Error> {
     // String is again written to a tempfile for Pandoc
     let mut input_file = NamedTempFile::new().context("Failed to create tempfile")?;
     write!(input_file, "{input}").context("Failed to write to tempfile")?;
@@ -75,15 +75,21 @@ pub fn pandoc_plain(input: &str) -> Result<String, anyhow::Error> {
         .output()
         .context("Failed to execute Pandoc")?;
 
-    let output = str::from_utf8(&pandoc.stdout)
+    let mut output = str::from_utf8(&pandoc.stdout)
         .context("Failed to convert Pandoc output to string")?
         .to_owned();
+
+    // In etym mode, insert space before POS in any headword line, if missing
+    if etym_mode {
+        let re_parens = Regex::new(r"(\S)(\([a-z]{1,3}\.\))\n").unwrap();
+        output = re_parens.replace_all(&output, "$1 $2\n").to_string();
+    }
 
     Ok(output)
 }
 
 // Main Pandoc function
-pub fn pandoc_primary(etym_mode: bool, results: &str) -> Result<String, anyhow::Error> {
+pub fn pandoc_primary(results: &str, etym_mode: bool) -> Result<String, anyhow::Error> {
     // Write results string into a tempfile to pass to Pandoc
     let mut input_file_1 = NamedTempFile::new().context("Failed to create tempfile")?;
     write!(input_file_1, "{results}").context("Failed to write to tempfile")?;
@@ -112,7 +118,7 @@ pub fn pandoc_primary(etym_mode: bool, results: &str) -> Result<String, anyhow::
         // I don't know why Pandoc is outputting these to begin with
         let after_2 = after_1.replace(r#"\\""#, r#"""#);
 
-        let final_output = pandoc_plain(&after_2)?;
+        let final_output = pandoc_plain(&after_2, true)?;
         Ok(final_output)
     } else {
         // Un-bold numbered list labels
@@ -126,7 +132,7 @@ pub fn pandoc_primary(etym_mode: bool, results: &str) -> Result<String, anyhow::
         // Un-escape double quotes
         let after_3 = after_2.replace(r#"\\""#, r#"""#);
 
-        let final_output = pandoc_plain(&after_3)?;
+        let final_output = pandoc_plain(&after_3, false)?;
         Ok(final_output)
     }
 }
@@ -154,7 +160,7 @@ mod tests {
         let section_vec = get_section_vec(etym_mode, &parsed_chunk);
         let results = compile_results(etym_mode, section_vec);
 
-        pandoc_primary(etym_mode, &results).unwrap()
+        pandoc_primary(&results, etym_mode).unwrap()
     }
 
     #[test]

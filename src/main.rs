@@ -184,7 +184,7 @@ fn main() -> Result<(), anyhow::Error> {
         let results = compile_results(etym_mode, section_vec);
 
         // Call out to Pandoc
-        let final_output = pandoc_primary(etym_mode, &results)?;
+        let final_output = pandoc_primary(&results, etym_mode)?;
 
         // Try to cache result; this can fail silently
         if db_available {
