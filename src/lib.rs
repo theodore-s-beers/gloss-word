@@ -48,7 +48,7 @@ pub fn get_response_text(lookup_url: &str) -> Result<String, anyhow::Error> {
 pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef> {
     // Set up a selector for the relevant section
     let section_selector = if etym_mode {
-        Selector::parse(r##"h2[id^="#etymonline"] span, section.-mt-4"##).unwrap()
+        Selector::parse("h2.scroll-m-16 span, section.-mt-4").unwrap()
     } else {
         Selector::parse(r#"div#Definition section[data-src="hm"]"#).unwrap()
     };
