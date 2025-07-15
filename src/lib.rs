@@ -45,7 +45,7 @@ pub fn get_response_text(lookup_url: &str) -> Result<String, anyhow::Error> {
 
 #[must_use]
 // Cull certain elements from the HTML fragment, based on CSS selectors
-pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef> {
+pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef<'_>> {
     // Set up a selector for the relevant section
     let section_selector = if etym_mode {
         Selector::parse("h2.scroll-m-16 span, section.-mt-4").unwrap()
