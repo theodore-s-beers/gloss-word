@@ -19,10 +19,10 @@ jobs:
     steps:
       - name: Download Pandoc
         run: wget
-          https://github.com/jgm/pandoc/releases/download/3.1.11.1/pandoc-3.1.11.1-1-amd64.deb
+          https://github.com/jgm/pandoc/releases/download/3.7.0.2/pandoc-3.7.0.2-1-amd64.deb
 
       - name: Install Pandoc
-        run: sudo dpkg -i pandoc-3.1.11.1-1-amd64.deb
+        run: sudo dpkg -i pandoc-3.7.0.2-1-amd64.deb
 
       - name: Check out code
         uses: actions/checkout@v4
