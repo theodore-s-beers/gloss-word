@@ -1,9 +1,12 @@
+---
 name: Test periodically
 
 on:
   schedule:
     - cron: "0 20 * * 1,4"
   workflow_dispatch:
+
+permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,14 +15,20 @@ jobs:
   build:
     name: Build and test
     runs-on: ubuntu-latest
+
     steps:
       - name: Download Pandoc
         run: wget
           https://github.com/jgm/pandoc/releases/download/3.1.11.1/pandoc-3.1.11.1-1-amd64.deb
+
       - name: Install Pandoc
         run: sudo dpkg -i pandoc-3.1.11.1-1-amd64.deb
-      - uses: actions/checkout@v3
+
+      - name: Check out code
+        uses: actions/checkout@v3
+
       - name: Build
         run: cargo build --verbose
+
       - name: Run tests
         run: cargo test --verbose
