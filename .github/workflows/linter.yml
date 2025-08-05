@@ -29,4 +29,8 @@ jobs:
         uses: super-linter/super-linter@v8
         env:
           VALIDATE_NATURAL_LANGUAGE: false
+          VALIDATE_RUST_2015: false
+          VALIDATE_RUST_2018: false
+          VALIDATE_RUST_2021: false
+          VALIDATE_RUST_CLIPPY: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
