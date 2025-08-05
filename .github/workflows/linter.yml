@@ -1,48 +1,32 @@
 ---
 name: Lint codebase
 
-#
-# Documentation:
-# https://help.github.com/en/articles/workflow-syntax-for-github-actions
-#
-
-###########################
-# Start job on PR to main #
-###########################
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
-###############
-# Set the job #
-###############
+permissions: {}
+
 jobs:
   build:
-    # Name the job
-    name: Lint codebase
-    # Set the agent to run on
+    name: Lint
     runs-on: ubuntu-latest
 
-    ##################
-    # Load all steps #
-    ##################
+    permissions:
+      contents: read
+      packages: read
+      statuses: write
+
     steps:
-      #########################
-      # Checkout the codebase #
-      #########################
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Check out code
+        uses: actions/checkout@v4
         with:
-          # Full history needed for list of changed files within `super-linter`
           fetch-depth: 0
 
-      ###############################
-      # Run linter against codebase #
-      ###############################
-      - name: Lint codebase
-        uses: github/super-linter@v4
+      - name: Run linter
+        uses: super-linter/super-linter@v8
         env:
-          VALIDATE_ALL_CODEBASE: true
           VALIDATE_NATURAL_LANGUAGE: false
-          DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
