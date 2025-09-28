@@ -170,6 +170,8 @@ mod tests {
 
     #[test]
     fn def_atavism() {
+        std::thread::sleep(std::time::Duration::from_secs(1)); // Getting rate-limited in CI?
+
         let etym_mode = false;
         let lookup_url = "https://www.thefreedictionary.com/atavism";
         let output = full_sequence(etym_mode, lookup_url)
@@ -178,11 +180,12 @@ mod tests {
         let standard = "at·a·vism\n\nn.\n\n1.  The reappearance of a characteristic in an organism after several\n    generations of absence.\n\n2.  An individual or a part that exhibits atavism. Also called\n    throwback.\n\n3.  The return of a trait or recurrence of previous behavior after a\n    period of absence.\n";
 
         assert_eq!(output, standard);
-        std::thread::sleep(std::time::Duration::from_secs(1)); // Getting rate-limited in CI?
     }
 
     #[test]
     fn def_isthmus() {
+        std::thread::sleep(std::time::Duration::from_secs(2)); // Getting rate-limited in CI?
+
         let etym_mode = false;
         let lookup_url = "https://www.thefreedictionary.com/isthmus";
         let output = full_sequence(etym_mode, lookup_url)
@@ -191,7 +194,6 @@ mod tests {
         let standard = "isth·mus\n\nn. pl. isth·mus·es or isth·mi (-mī′)\n\n1.  A narrow strip of land connecting two larger masses of land.\n\n2.  Anatomy\n\n    a.  A narrow strip of tissue joining two larger organs or parts of\n        an organ.\n\n    b.  A narrow passage connecting two larger cavities.\n";
 
         assert_eq!(output, standard);
-        std::thread::sleep(std::time::Duration::from_secs(1)); // Getting rate-limited in CI?
     }
 
     #[test]
