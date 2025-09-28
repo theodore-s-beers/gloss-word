@@ -18,6 +18,8 @@ jobs:
 
     steps:
       - name: Download Pandoc
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download \
           --repo jgm/pandoc \
