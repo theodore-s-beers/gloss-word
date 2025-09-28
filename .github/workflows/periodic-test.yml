@@ -27,7 +27,7 @@ jobs:
           --output pandoc-latest.deb
 
       - name: Install Pandoc
-        run: sudo dpkg -i pandoc-latest.deb
+        run: sudo dpkg -i --no-triggers pandoc-latest.deb
 
       - name: Check out code
         uses: actions/checkout@v4
