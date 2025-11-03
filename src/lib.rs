@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn def_isthmus() {
-        std::thread::sleep(std::time::Duration::from_secs(3)); // Getting rate-limited in CI?
+        std::thread::sleep(std::time::Duration::from_secs(5)); // Getting rate-limited in CI?
 
         let etym_mode = false;
         let lookup_url = "https://www.thefreedictionary.com/isthmus";
