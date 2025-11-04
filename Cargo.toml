@@ -21,7 +21,6 @@ regex = "1.12.2"
 reqwest = { version = "0.12.24", features = ["blocking"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 scraper = "0.24"
-tempfile = "3.23.0"
 trash = "5.2.5"
 
 [[bin]]

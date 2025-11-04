@@ -507,7 +507,6 @@ dependencies = [
  "reqwest",
  "rusqlite",
  "scraper",
- "tempfile",
  "trash",
 ]
 
