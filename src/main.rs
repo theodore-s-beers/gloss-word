@@ -3,8 +3,7 @@
 use core::time::Duration;
 use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
-use std::{fs, str};
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, anyhow};
 use clap::{Arg, ArgAction, command};
@@ -13,7 +12,6 @@ use gloss_word::{compile_results, get_response_text, get_section_vec, pandoc_pri
 use indicatif::{ProgressBar, ProgressStyle};
 use rusqlite::Connection;
 use scraper::{ElementRef, Selector};
-use tempfile::NamedTempFile;
 
 #[allow(clippy::too_many_lines)]
 fn main() -> Result<(), anyhow::Error> {
@@ -94,7 +92,7 @@ fn main() -> Result<(), anyhow::Error> {
 
         // If we don't have the cache dir yet, try to create it
         if !cache_dir.exists() {
-            let _dir = fs::create_dir_all(cache_dir);
+            let _dir = std::fs::create_dir_all(cache_dir);
         }
 
         // Construct appropriate path for db
@@ -243,24 +241,29 @@ fn main() -> Result<(), anyhow::Error> {
 
 // Function to call Pandoc in case of suggested alternate words
 fn pandoc_fallback(results: &str) -> Result<String, anyhow::Error> {
-    // Write results string into a tempfile to pass to Pandoc
-    let mut pandoc_input = NamedTempFile::new().context("Failed to create tempfile")?;
-    write!(pandoc_input, "{results}").context("Failed to write to tempfile")?;
-
-    let pandoc = Command::new("pandoc")
-        .arg(pandoc_input.path())
+    let mut pandoc = Command::new("pandoc")
         .arg("-f")
         .arg("html+smart-native_divs")
         .arg("-t")
         .arg("plain")
-        .output()
-        .context("Failed to execute Pandoc")?;
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("Failed to start pandoc process")?;
 
-    let pandoc_output = str::from_utf8(&pandoc.stdout)
-        .context("Failed to convert Pandoc output to string")?
-        .to_owned();
+    pandoc
+        .stdin
+        .as_mut()
+        .context("Failed to open pandoc stdin")?
+        .write_all(results.as_bytes())
+        .context("Failed to write to pandoc stdin")?;
 
-    Ok(pandoc_output)
+    let output = pandoc
+        .wait_with_output()
+        .context("Failed to read pandoc output")?;
+
+    let output_str = String::from_utf8_lossy(&output.stdout).into_owned();
+    Ok(output_str)
 }
 
 // Function to query db for cached results

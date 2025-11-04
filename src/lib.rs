@@ -1,14 +1,11 @@
 #![warn(clippy::pedantic, clippy::nursery)]
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
-use std::io::Write;
-use std::process::Command;
-use std::str; // For str::from_utf8
-
 use anyhow::Context;
 use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
-use tempfile::NamedTempFile;
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 #[must_use]
 // Take list of elements and compile them into a string (as appropriate)
@@ -64,55 +61,67 @@ pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef<'
 // Function to convert to plain text with Pandoc, as a final step
 // This used to be duplicated in pandoc_primary, but jscpd was complaining
 pub fn pandoc_plain(input: &str, etym_mode: bool) -> Result<String, anyhow::Error> {
-    // String is again written to a tempfile for Pandoc
-    let mut input_file = NamedTempFile::new().context("Failed to create tempfile")?;
-    write!(input_file, "{input}").context("Failed to write to tempfile")?;
+    let mut pandoc = Command::new("pandoc")
+        .args(["-t", "plain"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("Failed to start pandoc process")?;
 
-    let pandoc = Command::new("pandoc")
-        .arg(input_file.path())
-        .arg("-t")
-        .arg("plain")
-        .output()
-        .context("Failed to execute Pandoc")?;
+    pandoc
+        .stdin
+        .as_mut()
+        .context("Failed to open pandoc stdin")?
+        .write_all(input.as_bytes())
+        .context("Failed to write to pandoc stdin")?;
 
-    let mut output = str::from_utf8(&pandoc.stdout)
-        .context("Failed to convert Pandoc output to string")?
-        .to_owned();
+    let output = pandoc
+        .wait_with_output()
+        .context("Failed to read pandoc output")?;
+
+    let mut output_str = String::from_utf8_lossy(&output.stdout).into_owned();
 
     // In etym mode, insert space before POS in any headword line, if missing
     if etym_mode {
         let re_parens = Regex::new(r"(\S)(\([a-z]{1,3}\.\))\n").unwrap();
-        output = re_parens.replace_all(&output, "$1 $2\n").to_string();
+        output_str = re_parens.replace_all(&output_str, "$1 $2\n").to_string();
     }
 
-    Ok(output)
+    Ok(output_str)
 }
 
 // Main Pandoc function
 pub fn pandoc_primary(results: &str, etym_mode: bool) -> Result<String, anyhow::Error> {
-    // Write results string into a tempfile to pass to Pandoc
-    let mut input_file_1 = NamedTempFile::new().context("Failed to create tempfile")?;
-    write!(input_file_1, "{results}").context("Failed to write to tempfile")?;
-
-    let pandoc_1 = Command::new("pandoc")
-        .arg(input_file_1.path())
+    let mut pandoc_1 = Command::new("pandoc")
         .arg("-f")
         .arg("html+smart-native_divs")
         .arg("-t")
         .arg("markdown")
         .arg("--wrap=none")
-        .output()
-        .context("Failed to execute Pandoc")?;
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("Failed to start pandoc process")?;
+
+    pandoc_1
+        .stdin
+        .as_mut()
+        .context("Failed to open pandoc stdin")?
+        .write_all(results.as_bytes())
+        .context("Failed to write to pandoc stdin")?;
 
     // Take first Pandoc output as a string
-    let output_1 =
-        str::from_utf8(&pandoc_1.stdout).context("Failed to convert Pandoc output to string")?;
+    let output_1 = pandoc_1
+        .wait_with_output()
+        .context("Failed to read pandoc output")?;
+
+    let output_str_1 = core::str::from_utf8(&output_1.stdout)?;
 
     // Make regex (and simple text) replacements, depending on search mode
     if etym_mode {
         // Remove any figures
         let re_figures = Regex::new(r"(?m)\n\n!\[.+$").unwrap();
-        let after_1 = re_figures.replace_all(output_1, "");
+        let after_1 = re_figures.replace_all(output_str_1, "");
 
         // Un-escape double quotes
         // I don't know why Pandoc is outputting these to begin with
@@ -123,7 +132,7 @@ pub fn pandoc_primary(results: &str, etym_mode: bool) -> Result<String, anyhow::
     } else {
         // Un-bold numbered list labels
         let re_list_1 = Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap();
-        let after_1 = re_list_1.replace_all(output_1, "\n$a");
+        let after_1 = re_list_1.replace_all(output_str_1, "\n$a");
 
         // Un-bold and indent lettered list labels
         let re_list_2 = Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
