@@ -32,8 +32,18 @@ pub fn compile_results(etym_mode: bool, section_vec: Vec<ElementRef>) -> String 
 
 // Make HTTP request and read response body into string
 pub fn get_response_text(lookup_url: &str) -> Result<String, anyhow::Error> {
-    let response_text = reqwest::blocking::get(lookup_url)
+    // sadly, we need a minimal browser-like UA to avoid Cloudflare bot challenges
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko)")
+        .build()
+        .context("Failed to build HTTP client")?;
+
+    let response_text = client
+        .get(lookup_url)
+        .send()
         .context("Failed to complete HTTP request")?
+        .error_for_status()
+        .context("HTTP request returned error status")?
         .text()
         .context("Failed to decode HTTP response body")?;
 
