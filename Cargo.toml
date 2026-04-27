@@ -1,7 +1,7 @@
 [package]
 name = "gloss-word"
-version = "0.3.3"
-authors = ["Theo Beers <theo.beers@drexel.edu>"]
+version = "0.3.4"
+authors = ["Theo Beers <theo.beers@fu-berlin.de>"]
 edition = "2024"
 categories = ["command-line-utilities"]
 description = "A simple English dictionary lookup utility"
