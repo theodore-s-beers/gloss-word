@@ -1,5 +1,9 @@
 #![warn(clippy::pedantic, clippy::nursery)]
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::uninlined_format_args
+)]
 
 use anyhow::Context;
 use regex::Regex;
