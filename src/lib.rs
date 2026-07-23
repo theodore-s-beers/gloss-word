@@ -27,15 +27,35 @@ pub enum LookupMode {
     Etymology,
 }
 
+impl LookupMode {
+    #[must_use]
+    pub fn lookup_url(self, word: &str) -> String {
+        match self {
+            Self::Definition => {
+                format!(
+                    "https://www.thefreedictionary.com/{}",
+                    word.replace(' ', "+")
+                )
+            }
+            Self::Etymology => {
+                format!(
+                    "https://www.etymonline.com/word/{}",
+                    word.replace(' ', "%20")
+                )
+            }
+        }
+    }
+}
+
 #[must_use]
 // Take list of elements and compile them into a string (as appropriate)
-pub fn compile_results(mode: LookupMode, section_vec: Vec<ElementRef>) -> String {
+pub fn compile_results(mode: LookupMode, sections: Vec<ElementRef>) -> String {
     let mut results = String::new();
 
     match mode {
         LookupMode::Etymology => {
             // If etymology, just push everything from any sections
-            for section in section_vec {
+            for section in sections {
                 results.push_str(&section.html());
             }
         }
@@ -44,7 +64,7 @@ pub fn compile_results(mode: LookupMode, section_vec: Vec<ElementRef>) -> String
             let element_selectors = Selector::parse("div.pseg, h2, hr.hmsep").unwrap();
 
             // Push selected elements from first/only section
-            if let Some(section) = section_vec.first() {
+            if let Some(section) = sections.first() {
                 for element in section.select(&element_selectors) {
                     results.push_str(&element.html());
                 }
@@ -77,7 +97,7 @@ pub fn get_response_text(lookup_url: &str) -> Result<String, anyhow::Error> {
 
 #[must_use]
 // Cull certain elements from the HTML fragment, based on CSS selectors
-pub fn get_section_vec(mode: LookupMode, parsed_chunk: &Html) -> Vec<ElementRef<'_>> {
+pub fn get_sections(mode: LookupMode, parsed_chunk: &Html) -> Vec<ElementRef<'_>> {
     // Set up a selector for the relevant section
     let section_selector = match mode {
         LookupMode::Etymology => Selector::parse("h2.scroll-m-16 span, section.-mt-4").unwrap(),
@@ -203,13 +223,25 @@ mod tests {
         let response_text = get_response_text(lookup_url)?;
         let parsed_chunk = take_chunk(&response_text);
 
-        let section_vec = get_section_vec(mode, &parsed_chunk);
-        if section_vec.is_empty() {
+        let sections = get_sections(mode, &parsed_chunk);
+        if sections.is_empty() {
             return Err(anyhow!("Missing or bad response for the given URL"));
         }
 
-        let results = compile_results(mode, section_vec);
+        let results = compile_results(mode, sections);
         pandoc_primary(&results, mode)
+    }
+
+    #[test]
+    fn lookup_urls_encode_spaces_for_the_selected_source() {
+        assert_eq!(
+            LookupMode::Definition.lookup_url("ice cream"),
+            "https://www.thefreedictionary.com/ice+cream"
+        );
+        assert_eq!(
+            LookupMode::Etymology.lookup_url("ice cream"),
+            "https://www.etymonline.com/word/ice%20cream"
+        );
     }
 
     #[test]
