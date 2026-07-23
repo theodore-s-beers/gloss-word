@@ -1,14 +1,12 @@
 #![warn(clippy::pedantic, clippy::nursery, clippy::cargo)]
 
-use core::time::Duration;
-use std::io::Write;
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-
-use anyhow::{Context, anyhow};
+use anyhow::anyhow;
 use clap::{Arg, ArgAction, command};
 use directories::ProjectDirs;
-use gloss_word::{compile_results, get_response_text, get_section_vec, pandoc_primary, take_chunk};
+use gloss_word::{
+    compile_results, get_response_text, get_section_vec, pandoc_fallback, pandoc_primary,
+    take_chunk,
+};
 use indicatif::{ProgressBar, ProgressStyle};
 use rusqlite::Connection;
 use scraper::{ElementRef, Selector};
@@ -64,12 +62,7 @@ fn main() -> Result<(), anyhow::Error> {
         input_word.to_lowercase()
     };
 
-    // What will be the path to the cache db? Is the db accessible?
-    let mut db_path = PathBuf::new();
-    let mut db_available = false;
-
-    // Did we get a cache hit?
-    let mut cache_hit = false;
+    let mut db_conn = None;
 
     //
     // CACHE DIRECTORY
@@ -95,9 +88,7 @@ fn main() -> Result<(), anyhow::Error> {
             let _dir = std::fs::create_dir_all(cache_dir);
         }
 
-        // Construct appropriate path for db
-        db_path.push(cache_dir);
-        db_path.push("entries.sqlite");
+        db_conn = open_cache(&cache_dir.join("entries.sqlite")).ok();
     }
 
     //
@@ -105,36 +96,13 @@ fn main() -> Result<(), anyhow::Error> {
     //
 
     // Again, these operations can fail silently
-    if let Ok(db_conn) = Connection::open(&db_path) {
-        // Mark db available for later use
-        db_available = true;
-
-        // Create both tables, if they don't exist
-
-        let _create_dic = db_conn.execute(
-            "CREATE TABLE IF NOT EXISTS dictionary (
-                    word        TEXT UNIQUE NOT NULL,
-                    content     TEXT NOT NULL
-                )",
-            [],
-        );
-
-        let _create_etym = db_conn.execute(
-            "CREATE TABLE IF NOT EXISTS etymology (
-                    word        TEXT UNIQUE NOT NULL,
-                    content     TEXT NOT NULL
-                )",
-            [],
-        );
-
+    if let Some(db_conn) = &db_conn {
         // If we got a cache hit, handle it (usually print and return)
-        if let Ok(entry) = query_db(&db_conn, &desired_word, etym_mode) {
-            if force_fetch {
-                cache_hit = true;
-            } else {
-                print!("{entry}");
-                return Ok(());
-            }
+        if let Ok(entry) = query_db(db_conn, &desired_word, etym_mode)
+            && !force_fetch
+        {
+            print!("{entry}");
+            return Ok(());
         }
     }
 
@@ -146,7 +114,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Start a progress spinner; this could take a second
     let pb = ProgressBar::new_spinner();
-    pb.enable_steady_tick(Duration::from_millis(80));
+    pb.enable_steady_tick(core::time::Duration::from_millis(80));
     pb.set_style(
         ProgressStyle::default_spinner()
             .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
@@ -185,15 +153,8 @@ fn main() -> Result<(), anyhow::Error> {
         let final_output = pandoc_primary(&results, etym_mode)?;
 
         // Try to cache result; this can fail silently
-        if db_available {
-            let _update = update_cache(
-                cache_hit,
-                db_path,
-                &desired_word,
-                etym_mode,
-                &final_output,
-                force_fetch,
-            );
+        if let Some(db_conn) = &db_conn {
+            let _update = update_cache(db_conn, &desired_word, etym_mode, &final_output);
         }
 
         // We still need to print results, of course (after clearing the spinner)
@@ -239,31 +200,23 @@ fn main() -> Result<(), anyhow::Error> {
     Err(anyhow!("Definition not found"))
 }
 
-// Function to call Pandoc in case of suggested alternate words
-fn pandoc_fallback(results: &str) -> Result<String, anyhow::Error> {
-    let mut pandoc = Command::new("pandoc")
-        .arg("-f")
-        .arg("html+smart-native_divs")
-        .arg("-t")
-        .arg("plain")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .context("Failed to start pandoc process")?;
+fn open_cache(path: &std::path::Path) -> Result<Connection, rusqlite::Error> {
+    let db_conn = Connection::open(path)?;
+    db_conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS dictionary (
+            word        TEXT UNIQUE NOT NULL,
+            content     TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS etymology (
+            word        TEXT UNIQUE NOT NULL,
+            content     TEXT NOT NULL
+        );",
+    )?;
+    Ok(db_conn)
+}
 
-    pandoc
-        .stdin
-        .as_mut()
-        .context("Failed to open pandoc stdin")?
-        .write_all(results.as_bytes())
-        .context("Failed to write to pandoc stdin")?;
-
-    let output = pandoc
-        .wait_with_output()
-        .context("Failed to read pandoc output")?;
-
-    let output_str = String::from_utf8_lossy(&output.stdout).into_owned();
-    Ok(output_str)
+const fn cache_table(etym_mode: bool) -> &'static str {
+    if etym_mode { "etymology" } else { "dictionary" }
 }
 
 // Function to query db for cached results
@@ -272,63 +225,66 @@ fn query_db(
     desired_word: &str,
     etym_mode: bool,
 ) -> Result<String, rusqlite::Error> {
-    let mut query = String::new();
-
-    // Construct query as appropriate
-    if etym_mode {
-        query.push_str("SELECT * FROM etymology WHERE word = '");
-    } else {
-        query.push_str("SELECT * FROM dictionary WHERE word = '");
-    }
-
-    query.push_str(desired_word);
-    query.push('\'');
-
+    let query = format!(
+        "SELECT content FROM {} WHERE word = ?1",
+        cache_table(etym_mode)
+    );
     let mut stmt = db_conn.prepare(&query)?;
 
     // We're looking for only one row, and only its definition/etymology column
-    let entry_content: String = stmt.query_row([], |row| row.get(1))?;
+    let entry_content: String = stmt.query_row([desired_word], |row| row.get(0))?;
 
     Ok(entry_content)
 }
 
 // Function to try to update cache with new results
 fn update_cache(
-    cache_hit: bool,
-    db_path: PathBuf,
+    db_conn: &Connection,
     desired_word: &str,
     etym_mode: bool,
     final_output: &str,
-    force_fetch: bool,
 ) -> Result<(), rusqlite::Error> {
-    // Yes, this means a second db connection; I don't think it's so bad
-    let db_conn = Connection::open(db_path)?;
-
-    // If we have force-fetch flag and got a cache hit, update
-    if force_fetch && cache_hit {
-        if etym_mode {
-            db_conn.execute(
-                "UPDATE etymology SET content = (?1) WHERE word = (?2)",
-                [final_output, desired_word],
-            )?;
-        } else {
-            db_conn.execute(
-                "UPDATE dictionary SET content = (?1) WHERE word = (?2)",
-                [final_output, desired_word],
-            )?;
-        }
-    // Else insert
-    } else if etym_mode {
-        db_conn.execute(
-            "INSERT INTO etymology (word, content) VALUES (?1, ?2)",
-            [desired_word, final_output],
-        )?;
-    } else {
-        db_conn.execute(
-            "INSERT INTO dictionary (word, content) VALUES (?1, ?2)",
-            [desired_word, final_output],
-        )?;
-    }
+    let query = format!(
+        "INSERT INTO {} (word, content) VALUES (?1, ?2)
+         ON CONFLICT(word) DO UPDATE SET content = excluded.content",
+        cache_table(etym_mode)
+    );
+    db_conn.execute(&query, [desired_word, final_output])?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_cache() -> Connection {
+        open_cache(std::path::Path::new(":memory:")).unwrap()
+    }
+
+    #[test]
+    fn cache_round_trip_handles_apostrophes() {
+        let db_conn = test_cache();
+
+        update_cache(&db_conn, "o'clock", false, "a time").unwrap();
+
+        assert_eq!(
+            query_db(&db_conn, "o'clock", false).unwrap(),
+            "a time".to_owned()
+        );
+    }
+
+    #[test]
+    fn cache_update_replaces_existing_content_in_the_selected_table() {
+        let db_conn = test_cache();
+
+        update_cache(&db_conn, "forest", true, "old").unwrap();
+        update_cache(&db_conn, "forest", true, "new").unwrap();
+
+        assert_eq!(
+            query_db(&db_conn, "forest", true).unwrap(),
+            "new".to_owned()
+        );
+        assert!(query_db(&db_conn, "forest", false).is_err());
+    }
 }

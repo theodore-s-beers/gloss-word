@@ -9,7 +9,16 @@ use anyhow::Context;
 use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
+use std::sync::LazyLock;
+
+static ETYMOLOGY_HEADING: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(\S)(\([a-z]{1,3}\.\))\n").unwrap());
+static FIGURE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\n\n!\[.+$").unwrap());
+static NUMBERED_LIST_LABEL: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap());
+static LETTERED_LIST_LABEL: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap());
 
 #[must_use]
 // Take list of elements and compile them into a string (as appropriate)
@@ -26,8 +35,10 @@ pub fn compile_results(etym_mode: bool, section_vec: Vec<ElementRef>) -> String 
         let element_selectors = Selector::parse("div.pseg, h2, hr.hmsep").unwrap();
 
         // Push selected elements from first/only section
-        for element in section_vec[0].select(&element_selectors) {
-            results.push_str(&element.html());
+        if let Some(section) = section_vec.first() {
+            for element in section.select(&element_selectors) {
+                results.push_str(&element.html());
+            }
         }
     }
 
@@ -67,16 +78,12 @@ pub fn get_section_vec(etym_mode: bool, parsed_chunk: &Html) -> Vec<ElementRef<'
     // Run the select iterator and collect the result(s) in a vec
     // For definition lookup, this should yield either one item, or nothing
     // For etymology lookup, it could yield multiple sections
-    let section_vec: Vec<ElementRef> = parsed_chunk.select(&section_selector).collect();
-
-    section_vec
+    parsed_chunk.select(&section_selector).collect()
 }
 
-// Function to convert to plain text with Pandoc, as a final step
-// This used to be duplicated in pandoc_primary, but jscpd was complaining
-pub fn pandoc_plain(input: &str, etym_mode: bool) -> Result<String, anyhow::Error> {
+fn run_pandoc(input: &str, args: &[&str]) -> Result<Output, anyhow::Error> {
     let mut pandoc = Command::new("pandoc")
-        .args(["-t", "plain"])
+        .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -93,12 +100,20 @@ pub fn pandoc_plain(input: &str, etym_mode: bool) -> Result<String, anyhow::Erro
         .wait_with_output()
         .context("Failed to read pandoc output")?;
 
+    Ok(output)
+}
+
+// Function to convert to plain text with Pandoc, as a final step
+// This used to be duplicated in pandoc_primary, but jscpd was complaining
+pub fn pandoc_plain(input: &str, etym_mode: bool) -> Result<String, anyhow::Error> {
+    let output = run_pandoc(input, &["-t", "plain"])?;
     let mut output_str = String::from_utf8_lossy(&output.stdout).into_owned();
 
     // In etym mode, insert space before POS in any headword line, if missing
     if etym_mode {
-        let re_parens = Regex::new(r"(\S)(\([a-z]{1,3}\.\))\n").unwrap();
-        output_str = re_parens.replace_all(&output_str, "$1 $2\n").to_string();
+        output_str = ETYMOLOGY_HEADING
+            .replace_all(&output_str, "$1 $2\n")
+            .into_owned();
     }
 
     Ok(output_str)
@@ -106,36 +121,24 @@ pub fn pandoc_plain(input: &str, etym_mode: bool) -> Result<String, anyhow::Erro
 
 // Main Pandoc function
 pub fn pandoc_primary(results: &str, etym_mode: bool) -> Result<String, anyhow::Error> {
-    let mut pandoc_1 = Command::new("pandoc")
-        .arg("-f")
-        .arg("html+smart-native_divs")
-        .arg("-t")
-        .arg("markdown")
-        .arg("--wrap=none")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .context("Failed to start pandoc process")?;
-
-    pandoc_1
-        .stdin
-        .as_mut()
-        .context("Failed to open pandoc stdin")?
-        .write_all(results.as_bytes())
-        .context("Failed to write to pandoc stdin")?;
-
     // Take first Pandoc output as a string
-    let output_1 = pandoc_1
-        .wait_with_output()
-        .context("Failed to read pandoc output")?;
+    let output_1 = run_pandoc(
+        results,
+        &[
+            "-f",
+            "html+smart-native_divs",
+            "-t",
+            "markdown",
+            "--wrap=none",
+        ],
+    )?;
 
     let output_str_1 = core::str::from_utf8(&output_1.stdout)?;
 
     // Make regex (and simple text) replacements, depending on search mode
     if etym_mode {
         // Remove any figures
-        let re_figures = Regex::new(r"(?m)\n\n!\[.+$").unwrap();
-        let after_1 = re_figures.replace_all(output_str_1, "");
+        let after_1 = FIGURE.replace_all(output_str_1, "");
 
         // Un-escape double quotes
         // I don't know why Pandoc is outputting these to begin with
@@ -145,12 +148,10 @@ pub fn pandoc_primary(results: &str, etym_mode: bool) -> Result<String, anyhow::
         Ok(final_output)
     } else {
         // Un-bold numbered list labels
-        let re_list_1 = Regex::new(r"\n\*\*(?P<a>\d+\.)\*\*").unwrap();
-        let after_1 = re_list_1.replace_all(output_str_1, "\n$a");
+        let after_1 = NUMBERED_LIST_LABEL.replace_all(output_str_1, "\n$a");
 
         // Un-bold and indent lettered list labels
-        let re_list_2 = Regex::new(r"\n\*\*(?P<b>[a-z]\.)\*\*").unwrap();
-        let after_2 = re_list_2.replace_all(&after_1, "\n    $b");
+        let after_2 = LETTERED_LIST_LABEL.replace_all(&after_1, "\n    $b");
 
         // Un-escape double quotes
         let after_3 = after_2.replace(r#"\\""#, r#"""#);
@@ -160,17 +161,25 @@ pub fn pandoc_primary(results: &str, etym_mode: bool) -> Result<String, anyhow::
     }
 }
 
+// Convert fallback suggestions from HTML directly to plain text.
+pub fn pandoc_fallback(results: &str) -> Result<String, anyhow::Error> {
+    let output = run_pandoc(results, &["-f", "html+smart-native_divs", "-t", "plain"])?;
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
 #[must_use]
 // Take only part of the response text, for faster parsing
 pub fn take_chunk(response_text: &str) -> Html {
     // In definition mode, we split the document
     // Otherwise we could blow a bunch of time parsing the whole thing
     // In etymology mode, this shouldn't do anything
-    let chunks: Vec<&str> = response_text.split(r#"<div id="Thesaurus">"#).collect();
+    let chunk = response_text
+        .split_once(r#"<div id="Thesaurus">"#)
+        .map_or(response_text, |(chunk, _)| chunk);
 
     // Parse the first chunk, which is the one we want
     // For an etymology entry, the "first chunk" is the whole document
-    Html::parse_fragment(chunks[0])
+    Html::parse_fragment(chunk)
 }
 
 #[cfg(test)]
