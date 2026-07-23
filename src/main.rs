@@ -4,8 +4,8 @@ use anyhow::anyhow;
 use clap::{Arg, ArgAction, command};
 use directories::ProjectDirs;
 use gloss_word::{
-    compile_results, get_response_text, get_section_vec, pandoc_fallback, pandoc_primary,
-    take_chunk,
+    LookupMode, compile_results, get_response_text, get_section_vec, pandoc_fallback,
+    pandoc_primary, take_chunk,
 };
 use indicatif::{ProgressBar, ProgressStyle};
 use rusqlite::Connection;
@@ -51,7 +51,11 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Do we have flags?
     let clear_cache = matches.get_flag("clear-cache");
-    let etym_mode = matches.get_flag("etymology");
+    let lookup_mode = if matches.get_flag("etymology") {
+        LookupMode::Etymology
+    } else {
+        LookupMode::Definition
+    };
     let force_fetch = matches.get_flag("fetch-update");
 
     // Take input and lowercase it
@@ -98,7 +102,7 @@ fn main() -> Result<(), anyhow::Error> {
     // Again, these operations can fail silently
     if let Some(db_conn) = &db_conn {
         // If we got a cache hit, handle it (usually print and return)
-        if let Ok(entry) = query_db(db_conn, &desired_word, etym_mode)
+        if let Ok(entry) = query_db(db_conn, &desired_word, lookup_mode)
             && !force_fetch
         {
             print!("{entry}");
@@ -126,12 +130,15 @@ fn main() -> Result<(), anyhow::Error> {
     // Build the relevant URL
     let mut lookup_url: String;
 
-    if etym_mode {
-        lookup_url = "https://www.etymonline.com/word/".to_owned();
-        lookup_url += &desired_word.replace(' ', "%20");
-    } else {
-        lookup_url = "https://www.thefreedictionary.com/".to_owned();
-        lookup_url += &desired_word.replace(' ', "+");
+    match lookup_mode {
+        LookupMode::Etymology => {
+            lookup_url = "https://www.etymonline.com/word/".to_owned();
+            lookup_url += &desired_word.replace(' ', "%20");
+        }
+        LookupMode::Definition => {
+            lookup_url = "https://www.thefreedictionary.com/".to_owned();
+            lookup_url += &desired_word.replace(' ', "+");
+        }
     }
 
     // Make HTTP request and read response body into string
@@ -142,19 +149,19 @@ fn main() -> Result<(), anyhow::Error> {
     let parsed_chunk = take_chunk(&response_text);
 
     // Take specific selectors that we want
-    let section_vec = get_section_vec(etym_mode, &parsed_chunk);
+    let section_vec = get_section_vec(lookup_mode, &parsed_chunk);
 
     // If we got one or more sections...
     if !section_vec.is_empty() {
         // Compile results into string
-        let results = compile_results(etym_mode, section_vec);
+        let results = compile_results(lookup_mode, section_vec);
 
         // Call out to Pandoc
-        let final_output = pandoc_primary(&results, etym_mode)?;
+        let final_output = pandoc_primary(&results, lookup_mode)?;
 
         // Try to cache result; this can fail silently
         if let Some(db_conn) = &db_conn {
-            let _update = update_cache(db_conn, &desired_word, etym_mode, &final_output);
+            let _update = update_cache(db_conn, &desired_word, lookup_mode, &final_output);
         }
 
         // We still need to print results, of course (after clearing the spinner)
@@ -168,7 +175,7 @@ fn main() -> Result<(), anyhow::Error> {
     //
 
     // If we failed to get an etymology result, stop here
-    if etym_mode {
+    if lookup_mode == LookupMode::Etymology {
         pb.finish_and_clear();
         return Err(anyhow!("Etymology not found"));
     }
@@ -215,20 +222,20 @@ fn open_cache(path: &std::path::Path) -> Result<Connection, rusqlite::Error> {
     Ok(db_conn)
 }
 
-const fn cache_table(etym_mode: bool) -> &'static str {
-    if etym_mode { "etymology" } else { "dictionary" }
+const fn cache_table(mode: LookupMode) -> &'static str {
+    match mode {
+        LookupMode::Definition => "dictionary",
+        LookupMode::Etymology => "etymology",
+    }
 }
 
 // Function to query db for cached results
 fn query_db(
     db_conn: &Connection,
     desired_word: &str,
-    etym_mode: bool,
+    mode: LookupMode,
 ) -> Result<String, rusqlite::Error> {
-    let query = format!(
-        "SELECT content FROM {} WHERE word = ?1",
-        cache_table(etym_mode)
-    );
+    let query = format!("SELECT content FROM {} WHERE word = ?1", cache_table(mode));
     let mut stmt = db_conn.prepare(&query)?;
 
     // We're looking for only one row, and only its definition/etymology column
@@ -241,13 +248,13 @@ fn query_db(
 fn update_cache(
     db_conn: &Connection,
     desired_word: &str,
-    etym_mode: bool,
+    mode: LookupMode,
     final_output: &str,
 ) -> Result<(), rusqlite::Error> {
     let query = format!(
         "INSERT INTO {} (word, content) VALUES (?1, ?2)
          ON CONFLICT(word) DO UPDATE SET content = excluded.content",
-        cache_table(etym_mode)
+        cache_table(mode)
     );
     db_conn.execute(&query, [desired_word, final_output])?;
 
@@ -266,10 +273,10 @@ mod tests {
     fn cache_round_trip_handles_apostrophes() {
         let db_conn = test_cache();
 
-        update_cache(&db_conn, "o'clock", false, "a time").unwrap();
+        update_cache(&db_conn, "o'clock", LookupMode::Definition, "a time").unwrap();
 
         assert_eq!(
-            query_db(&db_conn, "o'clock", false).unwrap(),
+            query_db(&db_conn, "o'clock", LookupMode::Definition).unwrap(),
             "a time".to_owned()
         );
     }
@@ -278,13 +285,13 @@ mod tests {
     fn cache_update_replaces_existing_content_in_the_selected_table() {
         let db_conn = test_cache();
 
-        update_cache(&db_conn, "forest", true, "old").unwrap();
-        update_cache(&db_conn, "forest", true, "new").unwrap();
+        update_cache(&db_conn, "forest", LookupMode::Etymology, "old").unwrap();
+        update_cache(&db_conn, "forest", LookupMode::Etymology, "new").unwrap();
 
         assert_eq!(
-            query_db(&db_conn, "forest", true).unwrap(),
+            query_db(&db_conn, "forest", LookupMode::Etymology).unwrap(),
             "new".to_owned()
         );
-        assert!(query_db(&db_conn, "forest", false).is_err());
+        assert!(query_db(&db_conn, "forest", LookupMode::Definition).is_err());
     }
 }
