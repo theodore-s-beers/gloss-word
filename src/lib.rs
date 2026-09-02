@@ -78,7 +78,7 @@ pub fn compile_results(mode: LookupMode, sections: Vec<ElementRef>) -> String {
 // Make HTTP request and read response body into string
 pub fn get_response_text(lookup_url: &str) -> Result<String, anyhow::Error> {
     // sadly, we need a minimal browser-like UA to avoid Cloudflare bot challenges
-    let client = reqwest::blocking::Client::builder()
+    let client = bangboo::Client::builder()
         .user_agent("Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko)")
         .build()
         .context("Failed to build HTTP client")?;
